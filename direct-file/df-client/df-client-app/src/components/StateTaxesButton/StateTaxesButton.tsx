@@ -5,9 +5,13 @@ import useFact from '../../hooks/useFact.js';
 import useFetchStateProfile from '../../hooks/useFetchStateProfile.js';
 import { CommonLinkRenderer } from 'df-common-link-renderer';
 import { REF_LOCATION, REF_LOCATION_VALUE } from '../../constants/pageConstants.js';
+import { parseHttpsUrl } from '../../utils/urlUtils.js';
 
-const addQueryParams = (landingUrl: string) => {
-  const asUrl = new URL(landingUrl);
+const addQueryParams = (landingUrl: string): string | null => {
+  const asUrl = parseHttpsUrl(landingUrl);
+  if (asUrl === null) {
+    return null;
+  }
   asUrl.searchParams.append(REF_LOCATION, REF_LOCATION_VALUE.SUBMISSION);
   return asUrl.toString();
 };
@@ -27,6 +31,9 @@ const StateTaxesButton = () => {
   if (stateProfile) {
     const { landingUrl } = stateProfile;
     const landingUrlWithQueryParams = addQueryParams(landingUrl);
+    if (landingUrlWithQueryParams === null) {
+      return null;
+    }
 
     if (scopedStateDoesNotHavePersonalIncomeTax) {
       return (

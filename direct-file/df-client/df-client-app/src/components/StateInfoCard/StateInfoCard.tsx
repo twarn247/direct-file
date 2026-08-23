@@ -6,6 +6,7 @@ import { REF_LOCATION, REF_LOCATION_VALUE } from '../../constants/pageConstants.
 import { useTranslation } from 'react-i18next';
 import LoadingIndicator from '../LoadingIndicator/LoadingIndicator.js';
 import useFetchStateProfile from '../../hooks/useFetchStateProfile.js';
+import { parseHttpsUrl } from '../../utils/urlUtils.js';
 
 export type StateInfoCardProps = {
   i18nKey: string;
@@ -32,8 +33,10 @@ const StateInfoCard = ({ i18nKey, stateLinki18nKey, borderBottom }: StateInfoCar
     };
 
     const renderStateProfileInformation = (stateProfile: StateProfile) => {
-      const landingUrl = new URL(stateProfile.landingUrl);
-      appendQueryParams(landingUrl);
+      const landingUrl = parseHttpsUrl(stateProfile.landingUrl);
+      if (landingUrl !== null) {
+        appendQueryParams(landingUrl);
+      }
 
       return (
         <Translation
@@ -41,9 +44,12 @@ const StateInfoCard = ({ i18nKey, stateLinki18nKey, borderBottom }: StateInfoCar
           collectionId={null}
           context={context}
           components={{
-            StateLink: (
-              <CommonLinkRenderer url={landingUrl.toString()}>{stateProfile.taxSystemName}</CommonLinkRenderer>
-            ),
+            StateLink:
+              landingUrl === null ? (
+                <span>{stateProfile.taxSystemName}</span>
+              ) : (
+                <CommonLinkRenderer url={landingUrl.toString()}>{stateProfile.taxSystemName}</CommonLinkRenderer>
+              ),
           }}
         />
       );
