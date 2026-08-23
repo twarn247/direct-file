@@ -50,9 +50,12 @@ export const determineRedirectUrl = (
   allowedRedirectUrls: StateProfile['redirectUrls'],
   authorizationCode: string,
   sessionIdParam: string | null
-) => {
+): URL | null => {
   const baseUrl = redirectParam && allowedRedirectUrls.includes(redirectParam) ? redirectParam : defaultRedirectUrl;
-  const redirectUrl = new URL(baseUrl);
+  const redirectUrl = parseHttpsUrl(baseUrl);
+  if (redirectUrl === null) {
+    return null;
+  }
 
   redirectUrl.searchParams.append(AUTHORIZATION_CODE_PARAM_NAME, authorizationCode);
 
@@ -247,6 +250,11 @@ export const AuthorizeStateScreenContent = ({
             responseBody.authorizationCode,
             sessionId
           );
+          if (redirectUrl === null) {
+            // The state's redirect URL is unusable (not https). Treat as profile error.
+            handleGenerateAuthorizationCodeErrors(`Invalid redirect URL: expected https`);
+            return;
+          }
           window.location.assign(redirectUrl);
         } else {
           handleGenerateAuthorizationCodeErrors(responseBody.error);
