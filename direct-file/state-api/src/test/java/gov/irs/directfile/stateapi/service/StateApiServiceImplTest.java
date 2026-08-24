@@ -607,9 +607,9 @@ public class StateApiServiceImplTest {
 
         List<StateRedirect> stateRedirects = new ArrayList<>();
         var stateRedirect1 = mock(StateRedirect.class);
-        when(stateRedirect1.getRedirectUrl()).thenReturn("http://redirect.state.system/1");
+        when(stateRedirect1.getRedirectUrl()).thenReturn("https://redirect.state.system/1");
         var stateRedirect2 = mock(StateRedirect.class);
-        when(stateRedirect2.getRedirectUrl()).thenReturn("http://redirect.state.system/2");
+        when(stateRedirect2.getRedirectUrl()).thenReturn("https://redirect.state.system/2");
 
         stateRedirects.add(stateRedirect1);
         stateRedirects.add(stateRedirect2);
@@ -654,9 +654,9 @@ public class StateApiServiceImplTest {
 
         List<StateRedirect> stateRedirects = new ArrayList<>();
         var stateRedirect1 = mock(StateRedirect.class);
-        when(stateRedirect1.getRedirectUrl()).thenReturn("http://redirect.state.system/1");
+        when(stateRedirect1.getRedirectUrl()).thenReturn("https://redirect.state.system/1");
         var stateRedirect2 = mock(StateRedirect.class);
-        when(stateRedirect2.getRedirectUrl()).thenReturn("http://redirect.state.system/2");
+        when(stateRedirect2.getRedirectUrl()).thenReturn("https://redirect.state.system/2");
 
         stateRedirects.add(stateRedirect1);
         stateRedirects.add(stateRedirect2);
@@ -708,6 +708,76 @@ public class StateApiServiceImplTest {
                 .expectErrorMatches(
                         e -> e instanceof StateApiException && e.getMessage().equals("E_INTERNAL_SERVER_ERROR"))
                 .verify();
+    }
+
+    private StateProfileDTO stateProfileDtoWith(String landingUrl, String defaultRedirectUrl, List<String> redirects) {
+        return new StateProfileDTO(
+                "IN",
+                "INfreefile",
+                landingUrl,
+                defaultRedirectUrl,
+                "https://www.in.gov/dor/",
+                "https://www.in.gov/dor/individual-income-taxes/",
+                "https://www.in.gov/dor/cancel",
+                "https://www.in.gov/dor/cancel",
+                redirects,
+                Map.of("en", "en"),
+                true,
+                null,
+                false);
+    }
+
+    @Test
+    public void lookupStateProfile_rejectsJavascriptLandingUrl() {
+        StateProfileDTO dto = stateProfileDtoWith(
+                "javascript:alert(1)", "https://www.in.gov/dor/redirect", List.of("https://www.in.gov/dor/redirect"));
+        when(cachedDS.getStateProfileByStateCode("IN")).thenReturn(Mono.just(dto));
+
+        StepVerifier.create(service.lookupStateProfile("IN"))
+                .expectErrorMatches(e -> e instanceof StateApiException sae
+                        && sae.getErrorCode() == StateApiErrorCode.E_INTERNAL_SERVER_ERROR)
+                .verify();
+    }
+
+    @Test
+    public void lookupStateProfile_rejectsHttpDefaultRedirectUrl() {
+        StateProfileDTO dto = stateProfileDtoWith(
+                "https://www.in.gov/dor/",
+                "http://www.in.gov/dor/redirect",
+                List.of("https://www.in.gov/dor/redirect"));
+        when(cachedDS.getStateProfileByStateCode("IN")).thenReturn(Mono.just(dto));
+
+        StepVerifier.create(service.lookupStateProfile("IN"))
+                .expectErrorMatches(e -> e instanceof StateApiException sae
+                        && sae.getErrorCode() == StateApiErrorCode.E_INTERNAL_SERVER_ERROR)
+                .verify();
+    }
+
+    @Test
+    public void lookupStateProfile_dropsNonHttpsRedirectUrlsButKeepsProfile() {
+        StateProfileDTO dto = stateProfileDtoWith(
+                "https://www.in.gov/dor/",
+                "https://www.in.gov/dor/redirect",
+                List.of("https://www.in.gov/dor/redirect", "javascript:alert(1)", "http://www.in.gov/dor/other"));
+        when(cachedDS.getStateProfileByStateCode("IN")).thenReturn(Mono.just(dto));
+
+        StepVerifier.create(service.lookupStateProfile("IN"))
+                .assertNext(
+                        result -> assertThat(result.redirectUrls()).containsExactly("https://www.in.gov/dor/redirect"))
+                .verifyComplete();
+    }
+
+    @Test
+    public void lookupStateProfile_acceptsAllHttpsProfile() {
+        StateProfileDTO dto = stateProfileDtoWith(
+                "https://www.in.gov/dor/",
+                "https://www.in.gov/dor/redirect",
+                List.of("https://www.in.gov/dor/redirect"));
+        when(cachedDS.getStateProfileByStateCode("IN")).thenReturn(Mono.just(dto));
+
+        StepVerifier.create(service.lookupStateProfile("IN"))
+                .assertNext(result -> assertThat(result.stateCode()).isEqualTo("IN"))
+                .verifyComplete();
     }
 
     @Test
@@ -782,6 +852,8 @@ public class StateApiServiceImplTest {
         sp.setArchived(false);
         sp.setDepartmentOfRevenueUrl("url");
         sp.setFilingRequirementsUrl("url");
+        sp.setLandingUrl("https://www.state.gov/landing");
+        sp.setDefaultRedirectUrl("https://www.state.gov/redirect");
         return sp;
     }
 }

@@ -8,6 +8,7 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -388,7 +389,45 @@ public class StateApiServiceImpl implements StateApiService {
                 log.error("State {} is archived", stateCode);
                 throw new StateApiException(StateApiErrorCode.E_ACCOUNT_ARCHIVED);
             }
-            return dto;
+
+            // State profile URLs are rendered as links and navigated to inside the
+            // authenticated client. A non-https value (javascript:, data:, http:) is a
+            // misconfigured profile; fail closed rather than serve it.
+            if (!isHttpsUrl(dto.landingUrl())) {
+                log.error("State {} has a non-https landing_url; refusing to serve profile", stateCode);
+                throw new StateApiException(StateApiErrorCode.E_INTERNAL_SERVER_ERROR);
+            }
+            if (!isHttpsUrl(dto.defaultRedirectUrl())) {
+                log.error("State {} has a non-https default_redirect_url; refusing to serve profile", stateCode);
+                throw new StateApiException(StateApiErrorCode.E_INTERNAL_SERVER_ERROR);
+            }
+
+            // The redirect allowlist is filtered rather than fatal: dropping a bad entry
+            // is strictly safer than dropping the whole profile.
+            List<String> safeRedirects = dto.redirectUrls().stream()
+                    .filter(StateApiServiceImpl::isHttpsUrl)
+                    .toList();
+            if (safeRedirects.size() != dto.redirectUrls().size()) {
+                log.error(
+                        "State {} has {} non-https redirect url(s); they were dropped from the allowlist",
+                        stateCode,
+                        dto.redirectUrls().size() - safeRedirects.size());
+            }
+
+            return new StateProfileDTO(
+                    dto.stateCode(),
+                    dto.taxSystemName(),
+                    dto.landingUrl(),
+                    dto.defaultRedirectUrl(),
+                    dto.departmentOfRevenueUrl(),
+                    dto.filingRequirementsUrl(),
+                    dto.transferCancelUrl(),
+                    dto.waitingForAcceptanceCancelUrl(),
+                    safeRedirects,
+                    dto.languages(),
+                    dto.acceptedOnly(),
+                    dto.customFilingDeadline(),
+                    dto.archived());
         });
     }
 
@@ -433,5 +472,16 @@ public class StateApiServiceImpl implements StateApiService {
                 : OffsetDateTime.now().plusYears(1);
         log.info("Use CertOverride={} to retrieve public key.", certOverride);
         return cachedDS.retrievePublicKeyFromCert(cert, expDate);
+    }
+
+    private static boolean isHttpsUrl(String url) {
+        if (StringUtils.isBlank(url)) {
+            return false;
+        }
+        try {
+            return "https".equalsIgnoreCase(new java.net.URI(url).getScheme());
+        } catch (java.net.URISyntaxException e) {
+            return false;
+        }
     }
 }
