@@ -1,5 +1,6 @@
 package gov.irs.directfile.stateapi.authorization;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.*;
 
@@ -24,10 +25,32 @@ public class AuthorizationTokenService {
     private final int authorizationCodeExpiresInterval;
     private final String signingKey;
 
+    /**
+     * The HS256 key that signs state export tokens. This value was published in this
+     * repository's git history (application-development.yaml). Any deployment still
+     * using it must rotate before serving traffic, so the constructor refuses it.
+     */
+    private static final String PUBLISHED_DEVELOPMENT_KEY = "GTc+SlI7C7ECPHAhAvIWqn2yAvzAGMVj";
+
+    private static final int MIN_SIGNING_KEY_BYTES = 32; // HS256 requires >= 256 bits
+
     public AuthorizationTokenService(
             DataEncryptDecrypt dataEncryptDecrypt,
             @Value("${authorization-token.signing-key}") String signingKey,
             @Value("${authorization-code.expires-interval-seconds: 600}") int authorizationCodeExpiresInterval) {
+        if (signingKey == null || signingKey.isBlank()) {
+            throw new IllegalStateException(
+                    "authorization-token.signing-key is not set. Set STATE_API_AUTHORIZATION_TOKEN_SIGNING_KEY.");
+        }
+        if (signingKey.getBytes(StandardCharsets.UTF_8).length < MIN_SIGNING_KEY_BYTES) {
+            throw new IllegalStateException(
+                    "authorization-token.signing-key must be at least " + MIN_SIGNING_KEY_BYTES + " bytes for HS256.");
+        }
+        if (PUBLISHED_DEVELOPMENT_KEY.equals(signingKey)) {
+            throw new IllegalStateException(
+                    "authorization-token.signing-key is the key published in this repository's git history. Rotate it.");
+        }
+
         this.dataEncryptDecrypt = dataEncryptDecrypt;
         this.signingKey = signingKey;
         this.authorizationCodeExpiresInterval = authorizationCodeExpiresInterval;
