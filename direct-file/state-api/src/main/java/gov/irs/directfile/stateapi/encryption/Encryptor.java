@@ -54,9 +54,12 @@ public class Encryptor {
 
     public static AesGcmEncryptionResult aesGcmEncrypt(String plainText, byte[] aesKey, byte[] aesIV)
             throws InvalidCipherTextException {
-        assert aesKey.length == AES256_GCM_SECRET_LENGTH
-                : "AES 256 secret is not " + AES256_GCM_SECRET_LENGTH + " bytes";
-        assert aesIV.length == AES256_GCM_IV_LENGTH : "AES 256 IV is not " + AES256_GCM_IV_LENGTH + " bytes";
+        if (aesKey.length != AES256_GCM_SECRET_LENGTH) {
+            throw new IllegalArgumentException("AES 256 secret is not " + AES256_GCM_SECRET_LENGTH + " bytes");
+        }
+        if (aesIV.length != AES256_GCM_IV_LENGTH) {
+            throw new IllegalArgumentException("AES 256 IV is not " + AES256_GCM_IV_LENGTH + " bytes");
+        }
 
         // Plain text to be encrypted
         byte[] plaintextBytes = plainText.getBytes(StandardCharsets.UTF_8);

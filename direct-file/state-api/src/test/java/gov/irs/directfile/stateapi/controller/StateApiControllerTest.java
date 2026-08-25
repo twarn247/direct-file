@@ -19,6 +19,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.test.util.ReflectionTestUtils;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
@@ -33,6 +34,7 @@ import gov.irs.directfile.stateapi.exception.StateNotExistException;
 import gov.irs.directfile.stateapi.model.*;
 import gov.irs.directfile.stateapi.service.StateApiService;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -514,5 +516,21 @@ public class StateApiControllerTest {
 
     private void mockExportReturnEnabled(boolean exportReturnEnabled) {
         when(featureFlagClient.getBooleanValue(any(), any())).thenReturn(exportReturnEnabled);
+    }
+
+    @Test
+    public void getStateCode_returnsEmptyForSingleCharacterHeader() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader("x-header", "I");
+
+        assertEquals("", ReflectionTestUtils.invokeMethod(controller, "getStateCode", request));
+    }
+
+    @Test
+    public void getStateCode_returnsFirstTwoCharacters() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader("x-header", "IN-something");
+
+        assertEquals("IN", ReflectionTestUtils.invokeMethod(controller, "getStateCode", request));
     }
 }

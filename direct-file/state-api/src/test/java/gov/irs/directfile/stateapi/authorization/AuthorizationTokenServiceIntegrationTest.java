@@ -79,7 +79,7 @@ public class AuthorizationTokenServiceIntegrationTest {
                 .assertNext((token) -> {
                     try {
                         // when
-                        JWSVerifier signatureVerifier = new MACVerifier("GTc+SlI7C7ECPHAhAvIWqn2yAvzAGMVj");
+                        JWSVerifier signatureVerifier = new MACVerifier("0123456789abcdef0123456789abcdef");
                         byte[] ciphertext = Base64.getUrlDecoder().decode(token);
                         byte[] decrypted = dataEncryptDecrypt.decrypt(ciphertext);
                         SignedJWSParts signedJWSParts = mapper.readValue(decrypted, SignedJWSParts.class);

@@ -1,5 +1,6 @@
 package gov.irs.directfile.stateapi.authorization;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.*;
 
@@ -24,10 +25,33 @@ public class AuthorizationTokenService {
     private final int authorizationCodeExpiresInterval;
     private final String signingKey;
 
+    /**
+     * HS256 keys that have been published in this repository's git history at some
+     * point (application-development.yaml, then docker-compose.yaml's local-dev
+     * default). Any deployment using one of these must rotate before serving traffic.
+     */
+    private static final Set<String> KNOWN_COMMITTED_KEYS =
+            Set.of("GTc+SlI7C7ECPHAhAvIWqn2yAvzAGMVj", "1636cee96199ae396c208e65c86a1b21");
+
+    private static final int MIN_SIGNING_KEY_BYTES = 32; // HS256 requires >= 256 bits
+
     public AuthorizationTokenService(
             DataEncryptDecrypt dataEncryptDecrypt,
             @Value("${authorization-token.signing-key}") String signingKey,
             @Value("${authorization-code.expires-interval-seconds: 600}") int authorizationCodeExpiresInterval) {
+        if (signingKey == null || signingKey.isBlank()) {
+            throw new IllegalStateException(
+                    "authorization-token.signing-key is not set. Set STATE_API_AUTHORIZATION_TOKEN_SIGNING_KEY.");
+        }
+        if (signingKey.getBytes(StandardCharsets.UTF_8).length < MIN_SIGNING_KEY_BYTES) {
+            throw new IllegalStateException(
+                    "authorization-token.signing-key must be at least " + MIN_SIGNING_KEY_BYTES + " bytes for HS256.");
+        }
+        if (KNOWN_COMMITTED_KEYS.contains(signingKey)) {
+            throw new IllegalStateException(
+                    "authorization-token.signing-key is a key published in this repository's git history. Rotate it.");
+        }
+
         this.dataEncryptDecrypt = dataEncryptDecrypt;
         this.signingKey = signingKey;
         this.authorizationCodeExpiresInterval = authorizationCodeExpiresInterval;

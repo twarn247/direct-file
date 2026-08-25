@@ -14,7 +14,7 @@ import com.nimbusds.jose.crypto.MACVerifier;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 import lombok.SneakyThrows;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -31,10 +31,12 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 public class AuthorizationTokenServiceTest {
     private static final String TEST_SIGNING_KEY = "GTc+SlI7C7ECPHAhAvIWqn2yAvzAGMVj";
+    private static final String VALID_KEY = "0123456789abcdef0123456789abcdef";
+    private static final String PUBLISHED_KEY = "GTc+SlI7C7ECPHAhAvIWqn2yAvzAGMVj";
     private final ObjectMapper mapper = new ObjectMapper();
 
     public AuthorizationTokenService initializeService(DataEncryptDecrypt dataEncryptDecrypt) {
-        return new AuthorizationTokenService(dataEncryptDecrypt, TEST_SIGNING_KEY, 60);
+        return new AuthorizationTokenService(dataEncryptDecrypt, VALID_KEY, 60);
     }
 
     private AuthorizationTokenClaims setupClaims() {
@@ -133,7 +135,7 @@ public class AuthorizationTokenServiceTest {
         verify(dataEncryptDecrypt).encrypt(signedTokenCaptor.capture(), anyMap());
         byte[] signedTokenArgument = signedTokenCaptor.getValue();
         try {
-            JWSVerifier signatureVerifier = new MACVerifier(TEST_SIGNING_KEY);
+            JWSVerifier signatureVerifier = new MACVerifier(VALID_KEY);
             SignedJWSParts signedJWSParts = mapper.readValue(signedTokenArgument, SignedJWSParts.class);
             String signedJWS = String.join(".", signedJWSParts.s1(), signedJWSParts.s2(), signedJWSParts.s3());
             SignedJWT signedJWT = SignedJWT.parse(signedJWS);
@@ -205,5 +207,39 @@ public class AuthorizationTokenServiceTest {
         } catch (ParseException | IOException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    @Test
+    public void constructor_rejectsBlankSigningKey() {
+        assertThrows(
+                IllegalStateException.class,
+                () -> new AuthorizationTokenService(mock(DataEncryptDecrypt.class), "   ", 600));
+    }
+
+    @Test
+    public void constructor_rejectsShortSigningKey() {
+        assertThrows(
+                IllegalStateException.class,
+                () -> new AuthorizationTokenService(mock(DataEncryptDecrypt.class), "tooshort", 600));
+    }
+
+    @Test
+    public void constructor_rejectsThePublishedDevelopmentKey() {
+        assertThrows(
+                IllegalStateException.class,
+                () -> new AuthorizationTokenService(mock(DataEncryptDecrypt.class), PUBLISHED_KEY, 600));
+    }
+
+    @Test
+    public void constructor_rejectsTheDockerComposeDefaultKey() {
+        assertThrows(
+                IllegalStateException.class,
+                () -> new AuthorizationTokenService(
+                        mock(DataEncryptDecrypt.class), "1636cee96199ae396c208e65c86a1b21", 600));
+    }
+
+    @Test
+    public void constructor_acceptsAValidKey() {
+        assertDoesNotThrow(() -> new AuthorizationTokenService(mock(DataEncryptDecrypt.class), VALID_KEY, 600));
     }
 }

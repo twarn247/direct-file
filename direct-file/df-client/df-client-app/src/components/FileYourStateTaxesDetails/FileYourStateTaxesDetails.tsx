@@ -8,6 +8,7 @@ import LoadingIndicator from '../LoadingIndicator/LoadingIndicator.js';
 import Translation from '../Translation/index.js';
 import FileYourStateTaxesStepList from '../FileYourStateTaxesStepList/FileYourStateTaxesStepList.js';
 import { REF_LOCATION, REF_LOCATION_VALUE } from '../../constants/pageConstants.js';
+import { parseHttpsUrl } from '../../utils/urlUtils.js';
 
 const FileYourStateTaxesDetails = () => {
   const { taxReturns } = useContext(TaxReturnsContext);
@@ -27,13 +28,17 @@ const FileYourStateTaxesDetails = () => {
       stateTaxSystemName: stateProfile?.taxSystemName,
     };
 
-    const buildLandingUrl = (urlString: string) => {
-      const url = new URL(urlString);
+    const buildLandingUrl = (urlString: string): string | null => {
+      const url = parseHttpsUrl(urlString);
+      if (!url) {
+        return null;
+      }
       url.searchParams.append(REF_LOCATION, REF_LOCATION_VALUE.HOME);
       return url.toString();
     };
 
     const landingUrlWithRefLocationQueryParam = buildLandingUrl(stateProfile.landingUrl);
+    const filingRequirementsUrl = parseHttpsUrl(stateProfile.filingRequirementsUrl);
 
     return (
       <div>
@@ -44,7 +49,7 @@ const FileYourStateTaxesDetails = () => {
             context={context}
           />
         </h2>
-        {stateProfile.filingRequirementsUrl && ( // Only render this content if we have the link:
+        {filingRequirementsUrl && ( // Only render this content if we have the link:
           <p>
             <Translation
               i18nKey='taxReturnCard.fileYourStateTaxesDetails.details'
@@ -53,7 +58,7 @@ const FileYourStateTaxesDetails = () => {
             />
             <span>
               &nbsp;
-              <CommonLinkRenderer url={stateProfile.filingRequirementsUrl}>
+              <CommonLinkRenderer url={filingRequirementsUrl.toString()}>
                 <Translation
                   i18nKey='taxReturnCard.fileYourStateTaxesDetails.learnAboutStateFilingRequirementsButtonText'
                   collectionId={null}
@@ -73,13 +78,15 @@ const FileYourStateTaxesDetails = () => {
 
         <FileYourStateTaxesStepList />
 
-        <CommonLinkRenderer className='usa-button width-full margin-top-3' url={landingUrlWithRefLocationQueryParam}>
-          <Translation
-            i18nKey='taxReturnCard.fileYourStateTaxesDetails.startYourStateTaxesButtonText'
-            collectionId={null}
-            context={context}
-          />
-        </CommonLinkRenderer>
+        {landingUrlWithRefLocationQueryParam && (
+          <CommonLinkRenderer className='usa-button width-full margin-top-3' url={landingUrlWithRefLocationQueryParam}>
+            <Translation
+              i18nKey='taxReturnCard.fileYourStateTaxesDetails.startYourStateTaxesButtonText'
+              collectionId={null}
+              context={context}
+            />
+          </CommonLinkRenderer>
+        )}
       </div>
     );
   }

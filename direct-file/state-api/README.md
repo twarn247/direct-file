@@ -29,10 +29,40 @@ The `state-api` application will be accessible at http://localhost:8081, and the
 Health check: http://localhost:8081/actuator/health
 Swagger API:  http://localhost:8081/swagger-ui/index.html
 
+## Signing key configuration
+
+`authorization-token.signing-key` (env var `STATE_API_AUTHORIZATION_TOKEN_SIGNING_KEY`) signs
+state export JWTs. It has no default and the application refuses to start without it, or with
+a key shorter than 32 bytes, or with a key ever published in this repository's git history.
+
+Neither `docker-compose.yaml` nor `localrun.sh` sets this for you — export it yourself
+before starting state-api either way (e.g.
+`export STATE_API_AUTHORIZATION_TOKEN_SIGNING_KEY=$(openssl rand -hex 16)`), or the
+application will fail to start. A committed default in `docker-compose.yaml` was
+considered and rejected: any value checked into the repo becomes a published key,
+which `AuthorizationTokenService`'s startup guard exists specifically to refuse.
+
 ## Database migrations
 
 This app uses the same Liquibase setup as the [backend](../backend) app.
 See the [backend README section for database migrations for more details](../backend/README.md#database-migrations).
+
+## Onboarding a state partner
+
+State profiles are **not** ad-hoc database inserts. Onboarding a state changes which
+certificate authenticates that state's export requests, whether returns not yet
+accepted by the IRS are exportable, and where the authenticated client navigates
+taxpayers — so it goes through review like any code change.
+
+1. Copy `src/main/resources/db/TEMPLATE-onboard-state.yaml.example` to
+   `src/main/resources/db/migrations/<YYYYMMDDHHMM>-onboard-<state-code>.yaml`.
+2. Fill in every `CHANGE-ME`. All URLs must be `https`.
+3. Upload the state's X.509 certificate to the cert bucket at the `cert_location` key.
+4. Complete `docs/security/state-onboarding-checklist.md` and attach it to the PR.
+5. Get review from someone other than the author.
+
+To take a state offline, set `archived = true` — both profile lookup paths fail closed
+with `E_ACCOUNT_ARCHIVED`.
 
 ## Endpoints
 

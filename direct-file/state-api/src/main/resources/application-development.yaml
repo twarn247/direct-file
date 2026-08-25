@@ -3,7 +3,9 @@ spring:
     contexts: dev
 
 authorization-token:
-  signing-key: GTc+SlI7C7ECPHAhAvIWqn2yAvzAGMVj
+  # No default. Set STATE_API_AUTHORIZATION_TOKEN_SIGNING_KEY (>= 32 bytes).
+  # AuthorizationTokenService refuses to start without it.
+  signing-key: ${STATE_API_AUTHORIZATION_TOKEN_SIGNING_KEY}
 
 aws:
   enabled: false

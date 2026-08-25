@@ -6,6 +6,7 @@ import java.security.Security;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -208,6 +209,7 @@ public class StateApiServiceImplTest {
         StateAndAuthCode saCode = new StateAndAuthCode(authorizationCode.toString(), "FS");
 
         when(acRepo.getByAuthorizationCode(ac.getAuthorizationCode())).thenReturn(Mono.just(ac));
+        when(acRepo.markRedeemed(ac.getAuthorizationCode())).thenReturn(Mono.just(1));
 
         Mono<AuthorizationCode> entityMono = service.authorize(saCode);
 
@@ -252,6 +254,74 @@ public class StateApiServiceImplTest {
         Mono<AuthorizationCode> entityMono = service.authorize(saCode);
 
         StepVerifier.create(entityMono).expectError(StateApiException.class).verify();
+    }
+
+    private AuthorizationCode unexpiredCodeFor(UUID code, String stateCode) {
+        AuthorizationCode ac = new AuthorizationCode();
+        ac.setAuthorizationCode(code);
+        ac.setStateCode(stateCode);
+        ac.setTaxYear(2024);
+        ac.setTaxReturnUuid(UUID.randomUUID());
+        ac.setSubmissionId(SUBMISSION_ID);
+        ac.setExpiresAt(Timestamp.from(Instant.now().plusSeconds(600)));
+        return ac;
+    }
+
+    @Test
+    public void authorize_marksCodeRedeemedOnSuccess() {
+        UUID code = UUID.randomUUID();
+        AuthorizationCode ac = unexpiredCodeFor(code, "IN");
+        when(acRepo.getByAuthorizationCode(ac.getAuthorizationCode())).thenReturn(Mono.just(ac));
+        when(acRepo.markRedeemed(ac.getAuthorizationCode())).thenReturn(Mono.just(1));
+
+        StepVerifier.create(service.authorize(new StateAndAuthCode(code.toString(), "IN")))
+                .assertNext(result -> assertThat(result.getStateCode()).isEqualTo("IN"))
+                .verifyComplete();
+
+        Mockito.verify(acRepo).markRedeemed(ac.getAuthorizationCode());
+    }
+
+    @Test
+    public void authorize_rejectsAlreadyRedeemedCode() {
+        UUID code = UUID.randomUUID();
+        AuthorizationCode ac = unexpiredCodeFor(code, "IN");
+        when(acRepo.getByAuthorizationCode(ac.getAuthorizationCode())).thenReturn(Mono.just(ac));
+        // 0 rows updated: another exchange already redeemed it.
+        when(acRepo.markRedeemed(ac.getAuthorizationCode())).thenReturn(Mono.just(0));
+
+        StepVerifier.create(service.authorize(new StateAndAuthCode(code.toString(), "IN")))
+                .expectErrorMatches(e -> e instanceof StateApiException sae
+                        && sae.getErrorCode() == StateApiErrorCode.E_AUTHORIZATION_CODE_ALREADY_REDEEMED)
+                .verify();
+    }
+
+    @Test
+    public void authorize_doesNotRedeemOnStateCodeMismatch() {
+        UUID code = UUID.randomUUID();
+        AuthorizationCode ac = unexpiredCodeFor(code, "AZ");
+        when(acRepo.getByAuthorizationCode(ac.getAuthorizationCode())).thenReturn(Mono.just(ac));
+
+        StepVerifier.create(service.authorize(new StateAndAuthCode(code.toString(), "IN")))
+                .expectErrorMatches(e -> e instanceof StateApiException sae
+                        && sae.getErrorCode() == StateApiErrorCode.E_MISMATCHED_STATE_CODE)
+                .verify();
+
+        Mockito.verify(acRepo, Mockito.never()).markRedeemed(any());
+    }
+
+    @Test
+    public void authorize_doesNotRedeemAnExpiredCode() {
+        UUID code = UUID.randomUUID();
+        AuthorizationCode ac = unexpiredCodeFor(code, "IN");
+        ac.setExpiresAt(Timestamp.from(Instant.now().minusSeconds(1)));
+        when(acRepo.getByAuthorizationCode(ac.getAuthorizationCode())).thenReturn(Mono.just(ac));
+
+        StepVerifier.create(service.authorize(new StateAndAuthCode(code.toString(), "IN")))
+                .expectErrorMatches(e -> e instanceof StateApiException sae
+                        && sae.getErrorCode() == StateApiErrorCode.E_AUTHORIZATION_CODE_EXPIRED)
+                .verify();
+
+        Mockito.verify(acRepo, Mockito.never()).markRedeemed(any());
     }
 
     // Tests for authorization token
@@ -607,9 +677,9 @@ public class StateApiServiceImplTest {
 
         List<StateRedirect> stateRedirects = new ArrayList<>();
         var stateRedirect1 = mock(StateRedirect.class);
-        when(stateRedirect1.getRedirectUrl()).thenReturn("http://redirect.state.system/1");
+        when(stateRedirect1.getRedirectUrl()).thenReturn("https://redirect.state.system/1");
         var stateRedirect2 = mock(StateRedirect.class);
-        when(stateRedirect2.getRedirectUrl()).thenReturn("http://redirect.state.system/2");
+        when(stateRedirect2.getRedirectUrl()).thenReturn("https://redirect.state.system/2");
 
         stateRedirects.add(stateRedirect1);
         stateRedirects.add(stateRedirect2);
@@ -639,8 +709,8 @@ public class StateApiServiceImplTest {
                                 .containsAll(List.of(stateRedirect1.getRedirectUrl(), stateRedirect2.getRedirectUrl()))
                         && "english".equals(s.languages().get("en"))
                         && "spanish".equals(s.languages().get("es"))
-                        && "url".equals(s.departmentOfRevenueUrl())
-                        && "url".equals(s.filingRequirementsUrl()))
+                        && "https://www.state.gov/dor".equals(s.departmentOfRevenueUrl())
+                        && "https://www.state.gov/filing-requirements".equals(s.filingRequirementsUrl()))
                 .expectComplete()
                 .verify();
     }
@@ -654,9 +724,9 @@ public class StateApiServiceImplTest {
 
         List<StateRedirect> stateRedirects = new ArrayList<>();
         var stateRedirect1 = mock(StateRedirect.class);
-        when(stateRedirect1.getRedirectUrl()).thenReturn("http://redirect.state.system/1");
+        when(stateRedirect1.getRedirectUrl()).thenReturn("https://redirect.state.system/1");
         var stateRedirect2 = mock(StateRedirect.class);
-        when(stateRedirect2.getRedirectUrl()).thenReturn("http://redirect.state.system/2");
+        when(stateRedirect2.getRedirectUrl()).thenReturn("https://redirect.state.system/2");
 
         stateRedirects.add(stateRedirect1);
         stateRedirects.add(stateRedirect2);
@@ -708,6 +778,203 @@ public class StateApiServiceImplTest {
                 .expectErrorMatches(
                         e -> e instanceof StateApiException && e.getMessage().equals("E_INTERNAL_SERVER_ERROR"))
                 .verify();
+    }
+
+    private StateProfileDTO stateProfileDtoWith(String landingUrl, String defaultRedirectUrl, List<String> redirects) {
+        return new StateProfileDTO(
+                "IN",
+                "INfreefile",
+                landingUrl,
+                defaultRedirectUrl,
+                "https://www.in.gov/dor/",
+                "https://www.in.gov/dor/individual-income-taxes/",
+                "https://www.in.gov/dor/cancel",
+                "https://www.in.gov/dor/cancel",
+                redirects,
+                Map.of("en", "en"),
+                true,
+                null,
+                false);
+    }
+
+    @Test
+    public void lookupStateProfile_rejectsJavascriptLandingUrl() {
+        StateProfileDTO dto = stateProfileDtoWith(
+                "javascript:alert(1)", "https://www.in.gov/dor/redirect", List.of("https://www.in.gov/dor/redirect"));
+        when(cachedDS.getStateProfileByStateCode("IN")).thenReturn(Mono.just(dto));
+
+        StepVerifier.create(service.lookupStateProfile("IN"))
+                .expectErrorMatches(e -> e instanceof StateApiException sae
+                        && sae.getErrorCode() == StateApiErrorCode.E_INTERNAL_SERVER_ERROR)
+                .verify();
+    }
+
+    @Test
+    public void lookupStateProfile_rejectsHttpDefaultRedirectUrl() {
+        StateProfileDTO dto = stateProfileDtoWith(
+                "https://www.in.gov/dor/",
+                "http://www.in.gov/dor/redirect",
+                List.of("https://www.in.gov/dor/redirect"));
+        when(cachedDS.getStateProfileByStateCode("IN")).thenReturn(Mono.just(dto));
+
+        StepVerifier.create(service.lookupStateProfile("IN"))
+                .expectErrorMatches(e -> e instanceof StateApiException sae
+                        && sae.getErrorCode() == StateApiErrorCode.E_INTERNAL_SERVER_ERROR)
+                .verify();
+    }
+
+    @Test
+    public void lookupStateProfile_dropsNonHttpsRedirectUrlsButKeepsProfile() {
+        StateProfileDTO dto = stateProfileDtoWith(
+                "https://www.in.gov/dor/",
+                "https://www.in.gov/dor/redirect",
+                List.of("https://www.in.gov/dor/redirect", "javascript:alert(1)", "http://www.in.gov/dor/other"));
+        when(cachedDS.getStateProfileByStateCode("IN")).thenReturn(Mono.just(dto));
+
+        StepVerifier.create(service.lookupStateProfile("IN"))
+                .assertNext(
+                        result -> assertThat(result.redirectUrls()).containsExactly("https://www.in.gov/dor/redirect"))
+                .verifyComplete();
+    }
+
+    @Test
+    public void lookupStateProfile_acceptsAllHttpsProfile() {
+        StateProfileDTO dto = stateProfileDtoWith(
+                "https://www.in.gov/dor/",
+                "https://www.in.gov/dor/redirect",
+                List.of("https://www.in.gov/dor/redirect"));
+        when(cachedDS.getStateProfileByStateCode("IN")).thenReturn(Mono.just(dto));
+
+        StepVerifier.create(service.lookupStateProfile("IN"))
+                .assertNext(result -> assertThat(result.stateCode()).isEqualTo("IN"))
+                .verifyComplete();
+    }
+
+    @Test
+    public void lookupStateProfile_nullsNonHttpsDepartmentOfRevenueUrlButKeepsProfile() {
+        StateProfileDTO dto = new StateProfileDTO(
+                "IN",
+                "INfreefile",
+                "https://www.in.gov/dor/",
+                "https://www.in.gov/dor/redirect",
+                "javascript:alert(1)",
+                "https://www.in.gov/dor/individual-income-taxes/",
+                "https://www.in.gov/dor/cancel",
+                "https://www.in.gov/dor/cancel",
+                List.of("https://www.in.gov/dor/redirect"),
+                Map.of("en", "en"),
+                true,
+                null,
+                false);
+        when(cachedDS.getStateProfileByStateCode("IN")).thenReturn(Mono.just(dto));
+
+        StepVerifier.create(service.lookupStateProfile("IN"))
+                .assertNext(
+                        result -> assertThat(result.departmentOfRevenueUrl()).isNull())
+                .verifyComplete();
+    }
+
+    @Test
+    public void lookupStateProfile_nullsNonHttpsFilingRequirementsUrlButKeepsProfile() {
+        StateProfileDTO dto = new StateProfileDTO(
+                "IN",
+                "INfreefile",
+                "https://www.in.gov/dor/",
+                "https://www.in.gov/dor/redirect",
+                "https://www.in.gov/dor/",
+                "http://www.in.gov/dor/individual-income-taxes/",
+                "https://www.in.gov/dor/cancel",
+                "https://www.in.gov/dor/cancel",
+                List.of("https://www.in.gov/dor/redirect"),
+                Map.of("en", "en"),
+                true,
+                null,
+                false);
+        when(cachedDS.getStateProfileByStateCode("IN")).thenReturn(Mono.just(dto));
+
+        StepVerifier.create(service.lookupStateProfile("IN"))
+                .assertNext(result -> assertThat(result.filingRequirementsUrl()).isNull())
+                .verifyComplete();
+    }
+
+    @Test
+    public void lookupStateProfile_keepsValidHttpsDepartmentOfRevenueAndFilingRequirementsUrls() {
+        StateProfileDTO dto = stateProfileDtoWith(
+                "https://www.in.gov/dor/",
+                "https://www.in.gov/dor/redirect",
+                List.of("https://www.in.gov/dor/redirect"));
+        when(cachedDS.getStateProfileByStateCode("IN")).thenReturn(Mono.just(dto));
+
+        StepVerifier.create(service.lookupStateProfile("IN"))
+                .assertNext(result -> {
+                    assertThat(result.departmentOfRevenueUrl()).isEqualTo("https://www.in.gov/dor/");
+                    assertThat(result.filingRequirementsUrl())
+                            .isEqualTo("https://www.in.gov/dor/individual-income-taxes/");
+                })
+                .verifyComplete();
+    }
+
+    @Test
+    public void lookupStateProfile_nullsNonHttpsTransferCancelUrlButKeepsProfile() {
+        StateProfileDTO dto = new StateProfileDTO(
+                "IN",
+                "INfreefile",
+                "https://www.in.gov/dor/",
+                "https://www.in.gov/dor/redirect",
+                "https://www.in.gov/dor/",
+                "https://www.in.gov/dor/individual-income-taxes/",
+                "javascript:alert(1)",
+                "https://www.in.gov/dor/cancel",
+                List.of("https://www.in.gov/dor/redirect"),
+                Map.of("en", "en"),
+                true,
+                null,
+                false);
+        when(cachedDS.getStateProfileByStateCode("IN")).thenReturn(Mono.just(dto));
+
+        StepVerifier.create(service.lookupStateProfile("IN"))
+                .assertNext(result -> assertThat(result.transferCancelUrl()).isNull())
+                .verifyComplete();
+    }
+
+    @Test
+    public void lookupStateProfile_nullsNonHttpsWaitingForAcceptanceCancelUrlButKeepsProfile() {
+        StateProfileDTO dto = new StateProfileDTO(
+                "IN",
+                "INfreefile",
+                "https://www.in.gov/dor/",
+                "https://www.in.gov/dor/redirect",
+                "https://www.in.gov/dor/",
+                "https://www.in.gov/dor/individual-income-taxes/",
+                "https://www.in.gov/dor/cancel",
+                "http://www.in.gov/dor/cancel",
+                List.of("https://www.in.gov/dor/redirect"),
+                Map.of("en", "en"),
+                true,
+                null,
+                false);
+        when(cachedDS.getStateProfileByStateCode("IN")).thenReturn(Mono.just(dto));
+
+        StepVerifier.create(service.lookupStateProfile("IN"))
+                .assertNext(result ->
+                        assertThat(result.waitingForAcceptanceCancelUrl()).isNull())
+                .verifyComplete();
+    }
+
+    @Test
+    public void lookupStateProfile_keepsValidHttpsCancelUrls() {
+        StateProfileDTO dto = stateProfileDtoWith(
+                "https://www.in.gov/dor/",
+                "https://www.in.gov/dor/redirect",
+                List.of("https://www.in.gov/dor/redirect"));
+        when(cachedDS.getStateProfileByStateCode("IN")).thenReturn(Mono.just(dto));
+
+        StepVerifier.create(service.lookupStateProfile("IN"))
+                .assertNext(result -> {
+                    assertThat(result.transferCancelUrl()).isEqualTo("https://www.in.gov/dor/cancel");
+                    assertThat(result.waitingForAcceptanceCancelUrl()).isEqualTo("https://www.in.gov/dor/cancel");
+                })
+                .verifyComplete();
     }
 
     @Test
@@ -780,8 +1047,10 @@ public class StateApiServiceImplTest {
         sp.setCertLocation("x/y");
         sp.setAcceptedOnly(flag);
         sp.setArchived(false);
-        sp.setDepartmentOfRevenueUrl("url");
-        sp.setFilingRequirementsUrl("url");
+        sp.setDepartmentOfRevenueUrl("https://www.state.gov/dor");
+        sp.setFilingRequirementsUrl("https://www.state.gov/filing-requirements");
+        sp.setLandingUrl("https://www.state.gov/landing");
+        sp.setDefaultRedirectUrl("https://www.state.gov/redirect");
         return sp;
     }
 }

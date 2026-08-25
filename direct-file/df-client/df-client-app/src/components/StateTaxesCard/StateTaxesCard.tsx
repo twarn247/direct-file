@@ -13,6 +13,7 @@ import DFAlert from '../Alert/DFAlert.js';
 import FileYourStateTaxesModal from '../FileYourStateTaxesModal/FileYourStateTaxesModal.js';
 import Translation from '../Translation/index.js';
 import { formatAsContentDate, isPostFederalFilingDeadline } from '../../utils/dateUtils.js';
+import { parseHttpsUrl } from '../../utils/urlUtils.js';
 
 export type StateTaxesCardProps = {
   id: string;
@@ -22,8 +23,11 @@ export type StateTaxesCardProps = {
   returnWasRejected: boolean;
 };
 
-export const buildLandingUrl = (urlString: string) => {
-  const url = new URL(urlString);
+export const buildLandingUrl = (urlString: string): URL | null => {
+  const url = parseHttpsUrl(urlString);
+  if (!url) {
+    return null;
+  }
   url.searchParams.append(REF_LOCATION, REF_LOCATION_VALUE.HOME);
   return url;
 };
@@ -73,7 +77,7 @@ const StateTaxesCard = ({ id, stateProfile, returnWasRejected, taxYear }: StateT
 
   const filingDeadline = formatAsContentDate(FILING_DEADLINE, i18n);
 
-  const stateTaxToolLandingUrl = buildLandingUrl(landingUrl).toString();
+  const stateTaxToolLandingUrl = buildLandingUrl(landingUrl)?.toString() ?? `/file-your-state-taxes`;
 
   const fileYourStateTaxesUrl = stateCanTransferData ? `/file-your-state-taxes` : stateTaxToolLandingUrl;
 

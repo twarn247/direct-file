@@ -40,6 +40,8 @@ public class AuthorizationCode {
 
     @NotNull private Timestamp expiresAt;
 
+    private Timestamp redeemedAt;
+
     @NotBlank
     private String stateCode;
 

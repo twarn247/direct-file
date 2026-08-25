@@ -1,6 +1,7 @@
 import { Link } from '@trussworks/react-uswds';
 import { useContext, useState } from 'react';
 import { hasBeenSubmitted } from '../../utils/taxReturnUtils.js';
+import { parseHttpsUrl } from '../../utils/urlUtils.js';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import TransferReturnScreen from './TransferReturnScreen/TransferReturnScreen.js';
 import WaitingForAcceptanceScreen from './WaitingForAcceptanceScreen/WaitingForAcceptanceScreen.js';
@@ -49,9 +50,12 @@ export const determineRedirectUrl = (
   allowedRedirectUrls: StateProfile['redirectUrls'],
   authorizationCode: string,
   sessionIdParam: string | null
-) => {
+): URL | null => {
   const baseUrl = redirectParam && allowedRedirectUrls.includes(redirectParam) ? redirectParam : defaultRedirectUrl;
-  const redirectUrl = new URL(baseUrl);
+  const redirectUrl = parseHttpsUrl(baseUrl);
+  if (redirectUrl === null) {
+    return null;
+  }
 
   redirectUrl.searchParams.append(AUTHORIZATION_CODE_PARAM_NAME, authorizationCode);
 
@@ -246,6 +250,11 @@ export const AuthorizeStateScreenContent = ({
             responseBody.authorizationCode,
             sessionId
           );
+          if (redirectUrl === null) {
+            // The state's redirect URL is unusable (not https). Treat as profile error.
+            handleGenerateAuthorizationCodeErrors(`Invalid redirect URL: expected https`);
+            return;
+          }
           window.location.assign(redirectUrl);
         } else {
           handleGenerateAuthorizationCodeErrors(responseBody.error);
@@ -255,7 +264,12 @@ export const AuthorizeStateScreenContent = ({
       }
     };
 
-    const cancelUrl = new URL(transferCancelUrl || landingUrl);
+    const cancelUrl = parseHttpsUrl(transferCancelUrl) ?? parseHttpsUrl(landingUrl);
+    if (cancelUrl === null) {
+      // Both the state's cancel URL and its landing URL are unusable. Rather than
+      // navigate somewhere unsafe, treat this as a state profile error.
+      return <ErrorScreen errorMessage={t(`errors.stateProfileNotFound`)} handleGoBack={goHome} />;
+    }
     appendQueryParams(cancelUrl, sessionId);
 
     return (
@@ -273,7 +287,10 @@ export const AuthorizeStateScreenContent = ({
   }
 
   if (isWaitingForAcceptance) {
-    const cancelUrl = new URL(waitingForAcceptanceCancelUrl || landingUrl);
+    const cancelUrl = parseHttpsUrl(waitingForAcceptanceCancelUrl) ?? parseHttpsUrl(landingUrl);
+    if (cancelUrl === null) {
+      return <ErrorScreen errorMessage={t(`errors.stateProfileNotFound`)} handleGoBack={goHome} />;
+    }
     appendQueryParams(cancelUrl, sessionId);
 
     return (

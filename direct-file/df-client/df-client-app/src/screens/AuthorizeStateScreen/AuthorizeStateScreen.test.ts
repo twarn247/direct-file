@@ -22,11 +22,12 @@ describe(`determineRedirectUrl function`, () => {
     const result = determineRedirectUrl(baseUrl, redirectParam, allowedRedirectUrls, authCode, sessionIdParam);
 
     // then
-    expect(result.protocol).toBe(`https:`);
-    expect(result.host).toBe(`default.redirect.url`);
-    expect(result.searchParams.size).toBe(2);
-    expect(result.searchParams.get(AUTHORIZATION_CODE_PARAM_NAME)).toBe(authCode);
-    expect(result.searchParams.get(REF_LOCATION)).toBe(REF_LOCATION_VALUE.AUTHSTATE);
+    expect(result).not.toBeNull();
+    expect(result!.protocol).toBe(`https:`);
+    expect(result!.host).toBe(`default.redirect.url`);
+    expect(result!.searchParams.size).toBe(2);
+    expect(result!.searchParams.get(AUTHORIZATION_CODE_PARAM_NAME)).toBe(authCode);
+    expect(result!.searchParams.get(REF_LOCATION)).toBe(REF_LOCATION_VALUE.AUTHSTATE);
   });
 
   it(`appends the ${AUTHORIZATION_CODE_PARAM_NAME} to the default redirect Url`, () => {
@@ -45,10 +46,11 @@ describe(`determineRedirectUrl function`, () => {
     );
 
     // then
-    expect(result.host).toBe(`default.redirect.url`);
-    expect(result.searchParams.size).toBe(2);
-    expect(result.searchParams.get(AUTHORIZATION_CODE_PARAM_NAME)).toBe(authCode);
-    expect(result.searchParams.get(REF_LOCATION)).toBe(REF_LOCATION_VALUE.AUTHSTATE);
+    expect(result).not.toBeNull();
+    expect(result!.host).toBe(`default.redirect.url`);
+    expect(result!.searchParams.size).toBe(2);
+    expect(result!.searchParams.get(AUTHORIZATION_CODE_PARAM_NAME)).toBe(authCode);
+    expect(result!.searchParams.get(REF_LOCATION)).toBe(REF_LOCATION_VALUE.AUTHSTATE);
   });
 
   it(`sets the redirectUrl when ${REDIRECT_PARAM_NAME} is in the allowed list`, () => {
@@ -67,10 +69,11 @@ describe(`determineRedirectUrl function`, () => {
     );
 
     // then
-    expect(result.host).toBe(`custom.redirect.url`);
-    expect(result.searchParams.size).toBe(2);
-    expect(result.searchParams.get(AUTHORIZATION_CODE_PARAM_NAME)).toBe(authCode);
-    expect(result.searchParams.get(REF_LOCATION)).toBe(REF_LOCATION_VALUE.AUTHSTATE);
+    expect(result).not.toBeNull();
+    expect(result!.host).toBe(`custom.redirect.url`);
+    expect(result!.searchParams.size).toBe(2);
+    expect(result!.searchParams.get(AUTHORIZATION_CODE_PARAM_NAME)).toBe(authCode);
+    expect(result!.searchParams.get(REF_LOCATION)).toBe(REF_LOCATION_VALUE.AUTHSTATE);
   });
 
   it(`uses the default Url the ${REDIRECT_PARAM_NAME} param when not in the allowed list`, () => {
@@ -89,10 +92,11 @@ describe(`determineRedirectUrl function`, () => {
     );
 
     // then
-    expect(result.host).toBe(`default.redirect.url`);
-    expect(result.searchParams.size).toBe(2);
-    expect(result.searchParams.get(AUTHORIZATION_CODE_PARAM_NAME)).toBe(authCode);
-    expect(result.searchParams.get(REF_LOCATION)).toBe(REF_LOCATION_VALUE.AUTHSTATE);
+    expect(result).not.toBeNull();
+    expect(result!.host).toBe(`default.redirect.url`);
+    expect(result!.searchParams.size).toBe(2);
+    expect(result!.searchParams.get(AUTHORIZATION_CODE_PARAM_NAME)).toBe(authCode);
+    expect(result!.searchParams.get(REF_LOCATION)).toBe(REF_LOCATION_VALUE.AUTHSTATE);
   });
 
   it(`uses the default Url the ${REDIRECT_PARAM_NAME} param when the allowed list is empty`, () => {
@@ -111,10 +115,11 @@ describe(`determineRedirectUrl function`, () => {
     );
 
     // then
-    expect(result.host).toBe(`default.redirect.url`);
-    expect(result.searchParams.size).toBe(2);
-    expect(result.searchParams.get(AUTHORIZATION_CODE_PARAM_NAME)).toBe(authCode);
-    expect(result.searchParams.get(REF_LOCATION)).toBe(REF_LOCATION_VALUE.AUTHSTATE);
+    expect(result).not.toBeNull();
+    expect(result!.host).toBe(`default.redirect.url`);
+    expect(result!.searchParams.size).toBe(2);
+    expect(result!.searchParams.get(AUTHORIZATION_CODE_PARAM_NAME)).toBe(authCode);
+    expect(result!.searchParams.get(REF_LOCATION)).toBe(REF_LOCATION_VALUE.AUTHSTATE);
   });
 
   it(`appends the ${SESSION_ID_PARAM_NAME} as a queryParam`, () => {
@@ -133,11 +138,12 @@ describe(`determineRedirectUrl function`, () => {
     );
 
     // then
-    expect(result.host).toBe(`default.redirect.url`);
-    expect(result.searchParams.size).toBe(3);
-    expect(result.searchParams.get(AUTHORIZATION_CODE_PARAM_NAME)).toBe(authCode);
-    expect(result.searchParams.get(SESSION_ID_PARAM_NAME)).toBe(sessionIdParam);
-    expect(result.searchParams.get(REF_LOCATION)).toBe(REF_LOCATION_VALUE.AUTHSTATE);
+    expect(result).not.toBeNull();
+    expect(result!.host).toBe(`default.redirect.url`);
+    expect(result!.searchParams.size).toBe(3);
+    expect(result!.searchParams.get(AUTHORIZATION_CODE_PARAM_NAME)).toBe(authCode);
+    expect(result!.searchParams.get(SESSION_ID_PARAM_NAME)).toBe(sessionIdParam);
+    expect(result!.searchParams.get(REF_LOCATION)).toBe(REF_LOCATION_VALUE.AUTHSTATE);
   });
 
   it(`appends ${SESSION_ID_PARAM_NAME} and uses the ${REDIRECT_PARAM_NAME} param when in the allowed list`, () => {
@@ -156,10 +162,58 @@ describe(`determineRedirectUrl function`, () => {
     );
 
     // then
-    expect(result.host).toBe(`custom.redirect.url`);
-    expect(result.searchParams.size).toBe(3);
-    expect(result.searchParams.get(AUTHORIZATION_CODE_PARAM_NAME)).toBe(authCode);
-    expect(result.searchParams.get(SESSION_ID_PARAM_NAME)).toBe(sessionIdParam);
+    expect(result).not.toBeNull();
+    expect(result!.host).toBe(`custom.redirect.url`);
+    expect(result!.searchParams.size).toBe(3);
+    expect(result!.searchParams.get(AUTHORIZATION_CODE_PARAM_NAME)).toBe(authCode);
+    expect(result!.searchParams.get(SESSION_ID_PARAM_NAME)).toBe(sessionIdParam);
+  });
+
+  it(`returns null for a non-https defaultRedirectUrl`, () => {
+    // given
+    const redirectParam = null;
+    const allowedRedirectUrls: string[] = [];
+    const sessionIdParam = null;
+    const badDefaultUrl = `javascript:alert(1)`;
+
+    // when
+    const result = determineRedirectUrl(badDefaultUrl, redirectParam, allowedRedirectUrls, authCode, sessionIdParam);
+
+    // then
+    expect(result).toBeNull();
+  });
+
+  it(`returns null for an http defaultRedirectUrl`, () => {
+    // given
+    const redirectParam = null;
+    const allowedRedirectUrls: string[] = [];
+    const sessionIdParam = null;
+    const httpUrl = `http://default.redirect.url`;
+
+    // when
+    const result = determineRedirectUrl(httpUrl, redirectParam, allowedRedirectUrls, authCode, sessionIdParam);
+
+    // then
+    expect(result).toBeNull();
+  });
+
+  it(`returns null for a non-https redirectParam in allowedRedirectUrls`, () => {
+    // given
+    const badRedirectParam = `data:text/html,<script>alert(1)</script>`;
+    const allowedRedirectUrls = [badRedirectParam];
+    const sessionIdParam = null;
+
+    // when
+    const result = determineRedirectUrl(
+      defaultRedirectUrl,
+      badRedirectParam,
+      allowedRedirectUrls,
+      authCode,
+      sessionIdParam
+    );
+
+    // then
+    expect(result).toBeNull();
   });
 });
 

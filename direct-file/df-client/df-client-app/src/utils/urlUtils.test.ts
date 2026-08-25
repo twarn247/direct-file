@@ -1,4 +1,4 @@
-import { getTranslatedLink, urlHasLanguagePlaceholder } from './urlUtils.js';
+import { getTranslatedLink, parseHttpsUrl, urlHasLanguagePlaceholder } from './urlUtils.js';
 
 const URL_WITH_PLACEHOLDER = `www.directfile.gov/{LANGUAGE_CODE}/home/`;
 const URL_WITH_QUERY_PARAM_PLACEHOLDER = `www.directfile.gov/home?lang={LANGUAGE_CODE}`;
@@ -47,6 +47,45 @@ describe(`urlUtils`, () => {
       const translatedLink = getTranslatedLink(URL_WITH_QUERY_PARAM_PLACEHOLDER, `english`);
 
       expect(translatedLink).toEqual(URL_ENGLISH);
+    });
+  });
+
+  describe(`parseHttpsUrl`, () => {
+    it(`returns a URL for an https url`, () => {
+      const result = parseHttpsUrl(`https://www.in.gov/dor/`);
+
+      expect(result).not.toBeNull();
+      expect(result?.protocol).toBe(`https:`);
+      expect(result?.host).toBe(`www.in.gov`);
+    });
+
+    it(`returns null for a javascript: url`, () => {
+      expect(parseHttpsUrl(`javascript:alert(1)`)).toBeNull();
+    });
+
+    it(`returns null for a data: url`, () => {
+      expect(parseHttpsUrl(`data:text/html,<script>alert(1)</script>`)).toBeNull();
+    });
+
+    it(`returns null for an http url`, () => {
+      expect(parseHttpsUrl(`http://www.in.gov/dor/`)).toBeNull();
+    });
+
+    it(`returns null for an unparseable string`, () => {
+      expect(parseHttpsUrl(`not a url`)).toBeNull();
+    });
+
+    it(`returns null for null, undefined, and empty string`, () => {
+      expect(parseHttpsUrl(null)).toBeNull();
+      expect(parseHttpsUrl(undefined)).toBeNull();
+      expect(parseHttpsUrl(``)).toBeNull();
+    });
+
+    it(`returns a distinct URL object the caller can mutate safely`, () => {
+      const result = parseHttpsUrl(`https://www.in.gov/dor/`);
+      result?.searchParams.append(`ref`, `df`);
+
+      expect(result?.toString()).toBe(`https://www.in.gov/dor/?ref=df`);
     });
   });
 });

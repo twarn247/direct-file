@@ -30,7 +30,7 @@ public class CacheConfiguration {
     public CacheManager cacheManager(Caffeine<Object, Object> caffeine) {
         var caffeineCacheManager = new CaffeineCacheManager();
         caffeineCacheManager.setCaffeine(caffeine);
-        caffeineCacheManager.setCacheNames(List.of("publicKeyCache", "stateProfileCache"));
+        caffeineCacheManager.setCacheNames(List.of("certificateCache", "stateProfileCache"));
         caffeineCacheManager.setAsyncCacheMode(true);
         return caffeineCacheManager;
     }

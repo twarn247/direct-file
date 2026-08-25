@@ -1,5 +1,6 @@
 authorization-token:
-  signing-key: GTc+SlI7C7ECPHAhAvIWqn2yAvzAGMVj
+  # Use a valid test key (not the published development key)
+  signing-key: 0123456789abcdef0123456789abcdef
 
 direct-file:
   local-encryption:
