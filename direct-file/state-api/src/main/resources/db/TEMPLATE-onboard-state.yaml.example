@@ -1,13 +1,18 @@
 # Template for onboarding a state partner.
 #
-# Copy to <YYYYMMDDHHMM>-onboard-<state-code>.yaml, fill in every value, and open a PR.
+# Copy to db/migrations/<YYYYMMDDHHMM>-onboard-<state-code>.yaml, fill in every value,
+# and open a PR.
 # Onboarding a state is a security change: these values decide which certificate
 # authenticates the state's export requests, whether returns not yet accepted by the
 # IRS are exportable, and where the authenticated client navigates taxpayers.
 #
 # Before merging, complete docs/security/state-onboarding-checklist.md.
 #
-# The .example extension keeps this file out of db/changelog.yaml's includeAll.
+# Lives in db/, not db/migrations/, so it can never be picked up by
+# db/changelog.yaml's includeAll regardless of Liquibase's extension handling --
+# the .example extension alone was never confirmed against a live database in this
+# branch, and Liquibase's skip-vs-throw behavior for an unrecognized extension is
+# version-dependent.
 databaseChangeLog:
   - changeSet:
       id: onboard-state-XX

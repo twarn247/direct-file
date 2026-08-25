@@ -54,7 +54,7 @@ certificate authenticates that state's export requests, whether returns not yet
 accepted by the IRS are exportable, and where the authenticated client navigates
 taxpayers — so it goes through review like any code change.
 
-1. Copy `src/main/resources/db/migrations/TEMPLATE-onboard-state.yaml.example` to
+1. Copy `src/main/resources/db/TEMPLATE-onboard-state.yaml.example` to
    `src/main/resources/db/migrations/<YYYYMMDDHHMM>-onboard-<state-code>.yaml`.
 2. Fill in every `CHANGE-ME`. All URLs must be `https`.
 3. Upload the state's X.509 certificate to the cert bucket at the `cert_location` key.
