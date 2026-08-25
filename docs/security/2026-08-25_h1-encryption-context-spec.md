@@ -112,13 +112,17 @@ One property, `direct-file.encryption.context-verification`, two values:
 
 The data-import read paths (`PopulatedDataEntityListener`, `RawResponseDecryptor`) are pinned to legacy-tolerant behavior independent of this property, because §2.3 says this plan cannot migrate their writers. They are marked in code with the reason and the condition for lifting it.
 
+Those pinned paths accept untagged ciphertext **without reporting it**. This is not an oversight: they are untagged permanently, so if they emitted the marker, the Phase C gate in §3.4 — a log query for `ENCRYPTION_CONTEXT_LEGACY` returning zero — could never be satisfied, and the flip would end up gated on some filter improvised at a console instead. The marker must mean exactly one thing, *ciphertext still waiting to be migrated*, or it is not usable as a gate.
+
+A second marker, `ENCRYPTION_CONTEXT_MISMATCH`, records rule-2 refusals. It is never expected in normal operation, and it is emitted even on the pinned paths — permanent tolerance of *untagged* ciphertext is not tolerance of *mislabelled* ciphertext. Both data-import readers currently wrap their decrypt in a catch-all that logs and leaves the field unset; the mismatch is caught ahead of that catch-all so a substitution is not lost among malformed-JSON failures. The degradation behavior is deliberately unchanged — at the point the exception is raised the control has already worked, the plaintext having been refused and zeroed, so what was missing was observability rather than enforcement.
+
 ### 3.4 Phasing
 
 **Phase A — code (this plan's implementation).** Normalize all writes to the §3.1 schema. Thread expected purpose through every read path. Ship in `warn`. One deployable unit; no data migration.
 
 **Phase B — backfill.** Re-encrypt `taxreturns.facts`, `taxreturns.store`, and `taxreturn_submissions.facts` under the new contexts. Phase A must be fully deployed first, so that anything the backfill writes is already verified on read.
 
-**Phase C — enforce.** Flip the property once the Phase A counter has read zero across a full window of legitimate traffic — the window must exceed the longest interval at which a dormant tax return can be loaded, which is a data-retention question, not an engineering one, and the milestone owner has to answer it.
+**Phase C — enforce.** Flip the property once `ENCRYPTION_CONTEXT_LEGACY` has read zero across a full window of legitimate traffic — the window must exceed the longest interval at which a dormant tax return can be loaded, which is a data-retention question, not an engineering one, and the milestone owner has to answer it.
 
 Only Phase A is planned in detail. Phase B is specified at the interface level in §4 because its cost is the reason this item starts now; it is planned properly once Phase A's counter shows the real size of the legacy population.
 

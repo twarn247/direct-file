@@ -273,6 +273,8 @@ Spec §3.2 and §3.3. This is the finding's actual fix. Additive: new overloads 
 
 *Rate-limit the legacy log.* A large read of untouched rows would otherwise flood logs. Log the first occurrence per purpose per JVM at WARN, then every 1000th, always including the running count. The stable marker `ENCRYPTION_CONTEXT_LEGACY` is the Phase C gate: when a log query for it returns zero across the observation window, the mode can flip.
 
+*The legacy-tolerant path must not emit that marker.* This is the reason `decryptAndVerify` takes a three-valued `UntaggedPolicy` rather than a boolean. The data-import populations are untagged permanently and by design (spec §2.3), so if their reads reported, the gate's log query could never return zero and Phase C would either never fire or fire on some filter improvised at a console. The marker has to mean exactly one thing — *ciphertext that is still waiting to be migrated* — or it is not usable as a gate. `ACCEPT_SILENTLY` is what keeps it meaning that.
+
 *Do not use Lombok's `@AllArgsConstructor` for the new field.* Write the constructor explicitly — the class is registered via `@Import(DataEncryptDecrypt.class)` and the third argument needs to resolve as a bean, which is clearer spelled out.
 
 - [ ] **Step 1: Write the failing tests**
@@ -389,6 +391,30 @@ public class DataEncryptDecryptTest {
     }
 
     @Test
+    void warnModeReportsUntaggedCiphertext_soThePhaseCGateHasASignal() {
+        DataEncryptDecrypt subject = subject("warn");
+        byte[] legacy = awsCrypto.encryptData(cmm, PLAINTEXT, java.util.Map.of()).getResult();
+
+        subject.decrypt(legacy, EncryptionPurpose.TAX_RETURN_FACTS);
+
+        assertThat(subject.legacyCountFor(EncryptionPurpose.TAX_RETURN_FACTS)).isEqualTo(1L);
+    }
+
+    @Test
+    void legacyTolerantDecryptDoesNotReport_soThePhaseCGateCanReachZero() {
+        // The data-import populations are untagged permanently and by design. If reading them
+        // emitted ENCRYPTION_CONTEXT_LEGACY, a log query for that marker could never return zero
+        // and the Phase C gate would be unreachable.
+        DataEncryptDecrypt subject = subject("warn");
+        byte[] legacy = awsCrypto.encryptData(cmm, PLAINTEXT, java.util.Map.of()).getResult();
+
+        subject.decryptLegacyTolerant(legacy, EncryptionPurpose.DATA_IMPORT_POPULATED_DATA);
+
+        assertThat(subject.legacyCountFor(EncryptionPurpose.DATA_IMPORT_POPULATED_DATA))
+                .isZero();
+    }
+
+    @Test
     void legacyTolerantDecryptStillRejectsAWrongPurpose() {
         // Permanent legacy tolerance is not permission to accept a mislabelled blob.
         DataEncryptDecrypt subject = subject("enforce");
@@ -441,6 +467,13 @@ package gov.irs.directfile.models.encryption;
  * caller expected. Carries no plaintext and no context values — only purpose names.
  */
 public class EncryptionContextMismatchException extends RuntimeException {
+    /**
+     * Stable log marker, deliberately distinct from {@code ENCRYPTION_CONTEXT_LEGACY}. That one
+     * counts ciphertext still waiting to be migrated and is expected during Phase A; this one
+     * means a blob carried the wrong purpose and was refused, and is never expected.
+     */
+    public static final String MARKER = "ENCRYPTION_CONTEXT_MISMATCH";
+
     public EncryptionContextMismatchException(String message) {
         super(message);
     }
@@ -548,7 +581,10 @@ public class DataEncryptDecrypt {
      * {@code direct-file.encryption.context-verification}.
      */
     public byte[] decrypt(byte[] ciphertext, EncryptionPurpose expected) {
-        return decryptAndVerify(ciphertext, expected, encryptionContextProperties.isEnforcing());
+        return decryptAndVerify(
+                ciphertext,
+                expected,
+                encryptionContextProperties.isEnforcing() ? UntaggedPolicy.REJECT : UntaggedPolicy.REPORT);
     }
 
     /**
@@ -560,22 +596,38 @@ public class DataEncryptDecrypt {
      * Remove it when those writers adopt the purpose schema.
      */
     public byte[] decryptLegacyTolerant(byte[] ciphertext, EncryptionPurpose expected) {
-        return decryptAndVerify(ciphertext, expected, false);
+        return decryptAndVerify(ciphertext, expected, UntaggedPolicy.ACCEPT_SILENTLY);
     }
 
-    private byte[] decryptAndVerify(byte[] ciphertext, EncryptionPurpose expected, boolean rejectUntagged) {
+    /** What to do with ciphertext that carries no bound purpose. */
+    private enum UntaggedPolicy {
+        /** Enforcing mode: the migration is finished, so untagged is a fault. */
+        REJECT,
+        /** Warn mode: accept, and emit the marker the Phase C gate is measured against. */
+        REPORT,
+        /**
+         * Accept without reporting. Only for the permanently-pinned data-import paths: their
+         * untagged state is expected and will never change, so reporting it would mean the
+         * Phase C gate's log query could never reach zero.
+         */
+        ACCEPT_SILENTLY
+    }
+
+    private byte[] decryptAndVerify(byte[] ciphertext, EncryptionPurpose expected, UntaggedPolicy untaggedPolicy) {
         CryptoResult<byte[], ?> decryptResult = awsCrypto.decryptData(cryptoMaterialsManager, ciphertext);
         Map<String, String> context = decryptResult.getEncryptionContext();
         String found = context == null ? null : context.get(EncryptionContexts.PURPOSE_KEY);
         byte[] plaintext = decryptResult.getResult();
 
         if (found == null) {
-            if (rejectUntagged) {
+            if (untaggedPolicy == UntaggedPolicy.REJECT) {
                 return refuse(
                         plaintext,
                         "ciphertext carries no encryption context purpose; expected " + expected.wireValue());
             }
-            reportLegacy(expected);
+            if (untaggedPolicy == UntaggedPolicy.REPORT) {
+                reportLegacy(expected);
+            }
             return plaintext;
         }
 
@@ -591,6 +643,15 @@ public class DataEncryptDecrypt {
     private byte[] refuse(byte[] plaintext, String message) {
         Arrays.fill(plaintext, (byte) 0);
         throw new EncryptionContextMismatchException(message);
+    }
+
+    /**
+     * Untagged decrypts seen by this instance for {@code purpose}. Package-private: it exists so
+     * tests can assert that the permanently-pinned paths do not inflate the Phase C gate's signal.
+     */
+    long legacyCountFor(EncryptionPurpose purpose) {
+        AtomicLong count = legacyCounts.get(purpose);
+        return count == null ? 0L : count.get();
     }
 
     private void reportLegacy(EncryptionPurpose expected) {
@@ -900,6 +961,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -922,13 +984,43 @@ public class TaxReturnEntityListenerTest {
     private IdentitySupplier identitySupplier;
     private TaxReturnEntityListener listener;
 
+    // TaxReturnEntityListener.configure writes the class's *static* fields, and Surefire runs this
+    // module in a single reused JVM. Installing mocks there would leave them installed for every
+    // later test that reuses an already-cached Spring context. Save and restore around each test.
+    private static Object savedIdentitySupplier;
+    private static Object savedFactsEncryptor;
+    private static Object savedGenericStringEncryptor;
+
+    private static Object readStatic(String name) throws Exception {
+        java.lang.reflect.Field field = TaxReturnEntityListener.class.getDeclaredField(name);
+        field.setAccessible(true);
+        return field.get(null);
+    }
+
+    private static void writeStatic(String name, Object value) throws Exception {
+        java.lang.reflect.Field field = TaxReturnEntityListener.class.getDeclaredField(name);
+        field.setAccessible(true);
+        field.set(null, value);
+    }
+
     @BeforeEach
-    void setUp() {
+    void setUp() throws Exception {
+        savedIdentitySupplier = readStatic("identitySupplier");
+        savedFactsEncryptor = readStatic("factsEncryptor");
+        savedGenericStringEncryptor = readStatic("genericStringEncryptor");
+
         ded = mock(DataEncryptDecrypt.class);
         identitySupplier = mock(IdentitySupplier.class);
         when(ded.encrypt(any(), any(EncryptionPurpose.class), any())).thenReturn(new byte[] {1, 2, 3});
         listener = new TaxReturnEntityListener();
         listener.configure(identitySupplier, ded, new ObjectMapper());
+    }
+
+    @AfterEach
+    void restoreStatics() throws Exception {
+        writeStatic("identitySupplier", savedIdentitySupplier);
+        writeStatic("factsEncryptor", savedFactsEncryptor);
+        writeStatic("genericStringEncryptor", savedGenericStringEncryptor);
     }
 
     private TaxReturn taxReturnWithContent() {
@@ -1002,6 +1094,8 @@ public class TaxReturnEntityListenerTest {
 }
 ```
 
+The reflection in `setUp`/`restoreStatics` is deliberate and is not incidental scaffolding: without it this test class installs mocks into `TaxReturnEntityListener`'s static fields for the remainder of the JVM. Alphabetical ordering happens to put this class before `TaxReturnRepositoryTest`, so the damage would probably not show — but "probably" is doing real work in that sentence, and the resulting failure would present as an unrelated test NPE-ing inside an entity listener, which is close to unreadable. Restore the statics.
+
 Both collaborators were checked against the real types while writing this plan: `IdentityAttributes` is the record `(UUID id, UUID externalId, String email, String tin)` — final, so it is constructed rather than mocked — and `NullAuthenticationException` extends `RuntimeException` with only the implicit no-arg constructor. Neither needs re-deriving; do re-read them if either test fails to compile, since a record's component order is not something the compiler will catch you swapping.
 
 - [ ] **Step 2: Run the tests to verify they fail**
@@ -1047,21 +1141,43 @@ Remove the now-unused `java.util.HashMap` / `java.util.Map` imports and add `gov
 
 - [ ] **Step 4: Route the data-import read paths explicitly**
 
-In `PopulatedDataEntityListener:28`:
+Both classes wrap their decrypt in `catch (Exception e)`, log, and continue with the field unset — `PopulatedDataEntityListener.decryptColumn` leaves `data` unset, `RawResponseDecryptor.decryptRawResponse` returns null. That catch is pre-existing, but this change gives it new security-relevant content: an `EncryptionContextMismatchException` means a blob in that column carried the *wrong* purpose, which is precisely the substitution H-1 exists to detect, and under the existing catch-all it would be indistinguishable from a malformed-JSON failure.
+
+Catch it separately so it is visible, but **do not change the degradation behavior**. The control has already worked at the point the exception is thrown — the plaintext was refused and zeroed — so what is missing is observability, not enforcement. Making this path throw would change the failure mode of a user-facing data-import flow, which is outside H-1's scope.
+
+`PopulatedDataEntityListener.decryptColumn`:
 
 ```java
+    @PostLoad
+    public <T extends PopulatedData> void decryptColumn(T populatedData) {
+        try {
+            // Legacy-tolerant by design: this column's writer lives outside this repository, so
+            // this codebase cannot migrate it to carry a purpose. See spec section 2.3. Lift this
+            // when that writer adopts the schema.
             String decrypted = genericStringEncryptor.convertToEntityAttributeLegacyTolerant(
                     populatedData.getDataCipherText(), EncryptionPurpose.DATA_IMPORT_POPULATED_DATA);
+
+            JsonNode jsonNode;
+            jsonNode = objectMapper.readTree(decrypted);
+            populatedData.setData(jsonNode);
+        } catch (EncryptionContextMismatchException e) {
+            // A blob in this column is tagged with some other purpose. Decryption was refused and
+            // the plaintext discarded; surfaced under its own marker so it is not lost among parse
+            // failures. Behavior is otherwise unchanged: the field stays unset.
+            log.error(
+                    "{}: refused to decrypt data column in populated_data. Error: {}",
+                    EncryptionContextMismatchException.MARKER,
+                    e.getMessage());
+        } catch (Exception e) {
+            log.error(
+                    "Failed to decrypt / parse data column in populated_data. Exception: {}. Error: {}",
+                    e.getClass().getName(),
+                    e.getMessage());
+        }
+    }
 ```
 
-In `RawResponseDecryptor:24`:
-
-```java
-            String decrypted = genericStringEncryptor.convertToEntityAttributeLegacyTolerant(
-                    populatedData.getRawDataCipherText(), EncryptionPurpose.DATA_IMPORT_RAW_RESPONSE);
-```
-
-Add a comment at both sites pointing at spec §2.3, so the next reader knows the tolerance is deliberate and what would lift it.
+Apply the same shape to `RawResponseDecryptor.decryptRawResponse`, using `EncryptionPurpose.DATA_IMPORT_RAW_RESPONSE` and keeping its `return null` fall-through. Both files need imports for `EncryptionPurpose` and `EncryptionContextMismatchException`. `EncryptionContextMismatchException.MARKER` was defined in Task 2 Step 3; this is its first use.
 
 - [ ] **Step 5: Update the two existing tests that stub the old overloads**
 
@@ -1266,6 +1382,18 @@ Leave it at `warn` until the legacy population has been re-encrypted. Flipping t
 is a log query for `ENCRYPTION_CONTEXT_LEGACY` returning zero across an observation
 window longer than the longest interval at which a dormant tax return can be loaded.
 
+`ENCRYPTION_CONTEXT_LEGACY` means exactly one thing: *ciphertext still waiting to be
+migrated*. The data-import read paths are untagged permanently — their writer is outside
+this repository — so they are read through `decryptLegacyTolerant`, which accepts without
+reporting. If they reported, the gate above could never reach zero.
+
+Two markers, and they mean opposite things:
+
+| Marker | Meaning |
+|---|---|
+| `ENCRYPTION_CONTEXT_LEGACY` | expected during Phase A; the count that must reach zero |
+| `ENCRYPTION_CONTEXT_MISMATCH` | never expected; a blob carried the wrong purpose and was refused |
+
 See `docs/security/2026-08-25_h1-encryption-context-spec.md`.
 ```
 
@@ -1310,6 +1438,24 @@ Expected: PASS. These exercise the real export path end to end and are the stron
 - [ ] **Prove the dual-read window is real**
 
 `DataEncryptDecryptTest.acceptsLegacyUntaggedCiphertext_inWarnMode` must pass. If it does not, a deploy of this change makes every existing row unreadable — this is the single highest-consequence test in the plan.
+
+- [ ] **Prove the Phase C gate is reachable**
+
+`DataEncryptDecryptTest.legacyTolerantDecryptDoesNotReport_soThePhaseCGateCanReachZero` and
+`warnModeReportsUntaggedCiphertext_soThePhaseCGateHasASignal` must both pass. Together they are
+the gate's specification: the marker fires for migratable ciphertext and stays silent for the
+permanently-pinned paths. If only the first passes, the gate has no signal; if only the second
+does, the gate can never reach zero. Then confirm the two markers cannot be confused:
+
+```bash
+cd /Users/thomaswarn/repo/direct-file/direct-file
+grep -rn "ENCRYPTION_CONTEXT_LEGACY\|ENCRYPTION_CONTEXT_MISMATCH" --include=*.java --include=*.md .
+```
+
+Expected: `ENCRYPTION_CONTEXT_LEGACY` defined once in `DataEncryptDecrypt` and referenced only
+from `reportLegacy` and the two READMEs; `ENCRYPTION_CONTEXT_MISMATCH` defined once on the
+exception and referenced from the two data-import readers and the two READMEs. Neither string
+should appear on the other's path.
 
 - [ ] **Confirm the default is `warn` in every deployed profile**
 
