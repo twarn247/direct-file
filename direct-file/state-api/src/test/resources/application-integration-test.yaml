@@ -3,4 +3,4 @@ spring:
     enabled: true
 
 direct-file:
-  cert-location-override: fakestate.cer
+  cert-location-override: unexpired.cer
