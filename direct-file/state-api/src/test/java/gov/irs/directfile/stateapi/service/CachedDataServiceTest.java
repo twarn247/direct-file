@@ -1,8 +1,9 @@
 package gov.irs.directfile.stateapi.service;
 
-import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
+import java.security.cert.CertificateFactory;
+import java.security.cert.X509Certificate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -18,15 +19,16 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
+import gov.irs.directfile.error.StateApiErrorCode;
 import gov.irs.directfile.stateapi.exception.StateApiException;
 import gov.irs.directfile.stateapi.exception.StateNotExistException;
 import gov.irs.directfile.stateapi.model.StateProfile;
 import gov.irs.directfile.stateapi.model.StateRedirect;
-import gov.irs.directfile.stateapi.repository.StateApiS3Client;
 import gov.irs.directfile.stateapi.repository.StateLanguageRepository;
 import gov.irs.directfile.stateapi.repository.StateProfileRepository;
 import gov.irs.directfile.stateapi.repository.StateRedirectRepository;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -36,7 +38,7 @@ public class CachedDataServiceTest {
     private CachedDataService cachedDS;
 
     @Mock
-    private StateApiS3Client s3Client;
+    private CertificateLoader certificateLoader;
 
     @Mock
     private StateProfileRepository spRepo;
@@ -49,10 +51,8 @@ public class CachedDataServiceTest {
 
     @Test
     public void testRetrievePublicKeyFromCert_Success() throws Exception {
-        String keyPath = "src/test/resources/certificates/fakestate.cer";
-        InputStream is = new FileInputStream(new File(keyPath));
-
-        when(s3Client.getCert("cert-name")).thenReturn(Mono.just(is));
+        X509Certificate validCert = loadFixtureCertificate("unexpired.cer");
+        when(certificateLoader.loadCertificate("cert-name")).thenReturn(Mono.just(validCert));
 
         var resultMono = cachedDS.retrievePublicKeyFromCert("cert-name", null);
 
@@ -63,11 +63,10 @@ public class CachedDataServiceTest {
 
     @Test
     public void testRetrievePublicKeyFromCert_CertExpired() throws Exception {
-        String keyPath = "src/test/resources/certificates/fakestate.cer";
-        InputStream is = new FileInputStream(new File(keyPath));
+        X509Certificate validCert = loadFixtureCertificate("unexpired.cer");
         OffsetDateTime expireDateTime = OffsetDateTime.of(2023, 1, 1, 1, 1, 1, 1, ZoneOffset.UTC);
 
-        when(s3Client.getCert("cert-name")).thenReturn(Mono.just(is));
+        when(certificateLoader.loadCertificate("cert-name")).thenReturn(Mono.just(validCert));
 
         var resultMono = cachedDS.retrievePublicKeyFromCert("cert-name", expireDateTime);
 
@@ -75,6 +74,57 @@ public class CachedDataServiceTest {
                 .expectErrorMatches(
                         e -> e instanceof StateApiException && e.getMessage().equals("E_CERTIFICATE_EXPIRED"))
                 .verify();
+    }
+
+    @Test
+    public void retrievePublicKeyFromCert_rejectsWhenEnforcedDateHasPassed() throws Exception {
+        X509Certificate validCert = loadFixtureCertificate("unexpired.cer");
+        when(certificateLoader.loadCertificate("fakestate.cer")).thenReturn(Mono.just(validCert));
+
+        OffsetDateTime enforcedInThePast = OffsetDateTime.now(ZoneOffset.UTC).minusDays(1);
+
+        StepVerifier.create(cachedDS.retrievePublicKeyFromCert("fakestate.cer", enforcedInThePast))
+                .expectErrorMatches(e -> e instanceof StateApiException sae
+                        && sae.getErrorCode() == StateApiErrorCode.E_CERTIFICATE_EXPIRED)
+                .verify();
+    }
+
+    @Test
+    public void retrievePublicKeyFromCert_reevaluatesEnforcedDateOnEveryCall() throws Exception {
+        X509Certificate validCert = loadFixtureCertificate("unexpired.cer");
+        when(certificateLoader.loadCertificate("fakestate.cer")).thenReturn(Mono.just(validCert));
+
+        OffsetDateTime future = OffsetDateTime.now(ZoneOffset.UTC).plusDays(1);
+        OffsetDateTime past = OffsetDateTime.now(ZoneOffset.UTC).minusDays(1);
+
+        // First call succeeds with a future enforced date.
+        StepVerifier.create(cachedDS.retrievePublicKeyFromCert("fakestate.cer", future))
+                .assertNext(key -> assertThat(key).isNotNull())
+                .verifyComplete();
+
+        // Second call with a past enforced date must fail even though the certificate
+        // itself is cached. This is the regression this task exists to prevent.
+        StepVerifier.create(cachedDS.retrievePublicKeyFromCert("fakestate.cer", past))
+                .expectErrorMatches(e -> e instanceof StateApiException sae
+                        && sae.getErrorCode() == StateApiErrorCode.E_CERTIFICATE_EXPIRED)
+                .verify();
+    }
+
+    @Test
+    public void retrievePublicKeyFromCert_returnsKeyWhenBothDatesAreInTheFuture() throws Exception {
+        X509Certificate validCert = loadFixtureCertificate("unexpired.cer");
+        when(certificateLoader.loadCertificate("fakestate.cer")).thenReturn(Mono.just(validCert));
+
+        StepVerifier.create(cachedDS.retrievePublicKeyFromCert(
+                        "fakestate.cer", OffsetDateTime.now(ZoneOffset.UTC).plusDays(1)))
+                .assertNext(key -> assertThat(key).isNotNull())
+                .verifyComplete();
+    }
+
+    private X509Certificate loadFixtureCertificate(String name) throws Exception {
+        try (InputStream is = new FileInputStream("src/test/resources/certificates/" + name)) {
+            return (X509Certificate) CertificateFactory.getInstance("X.509").generateCertificate(is);
+        }
     }
 
     @Test

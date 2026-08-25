@@ -1,9 +1,6 @@
 package gov.irs.directfile.stateapi.service;
 
 import java.security.PublicKey;
-import java.security.cert.CertificateException;
-import java.security.cert.CertificateFactory;
-import java.security.cert.X509Certificate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Date;
@@ -26,7 +23,6 @@ import gov.irs.directfile.stateapi.exception.StateNotExistException;
 import gov.irs.directfile.stateapi.model.StateLanguage;
 import gov.irs.directfile.stateapi.model.StateProfile;
 import gov.irs.directfile.stateapi.model.StateRedirect;
-import gov.irs.directfile.stateapi.repository.StateApiS3Client;
 import gov.irs.directfile.stateapi.repository.StateLanguageRepository;
 import gov.irs.directfile.stateapi.repository.StateProfileRepository;
 import gov.irs.directfile.stateapi.repository.StateRedirectRepository;
@@ -36,7 +32,7 @@ import gov.irs.directfile.stateapi.repository.StateRedirectRepository;
 @SuppressWarnings("PMD.PreserveStackTrace")
 public class CachedDataService {
     @Autowired
-    private StateApiS3Client s3Client;
+    private CertificateLoader certificateLoader;
 
     @Autowired
     private StateProfileRepository spRepo;
@@ -53,51 +49,41 @@ public class CachedDataService {
     // Note: We are applying cache of cache to a Mono. The native Caffeine cache's 'expireAfterAccess' won't take
     // effect. For the sake of simplicity, we periodically evict the caches.
     @CacheEvict(
-            value = {"publicKeyCache", "stateProfileCache"},
+            value = {"certificateCache", "stateProfileCache"},
             allEntries = true)
     @Scheduled(fixedRateString = "${spring.cache.TTL-minutes}", timeUnit = TimeUnit.MINUTES)
     public void emptyCaches() {
-        log.info("caches (publicKeyCache, stateProfileCache) were evicted after {} minutes", cacheTTL);
+        log.info("caches (certificateCache, stateProfileCache) were evicted after {} minutes", cacheTTL);
     }
 
-    // NOTE: the cert is cached and expiration won't apply during the cache duration
-    @Cacheable(cacheNames = "publicKeyCache", key = "#certName")
+    /**
+     * Resolves a state's public key.
+     *
+     * The parsed certificate is cached (CertificateLoader); the expiration checks are
+     * NOT. Both the certificate's own notAfter and the IRS-enforced expiration date are
+     * evaluated on every call, so administratively expiring a compromised certificate
+     * takes effect immediately rather than after the cache TTL.
+     */
     public Mono<PublicKey> retrievePublicKeyFromCert(String certName, OffsetDateTime enforcedExpirationDate) {
         log.info("enter retrievePublicKeyFromCert()...for {}", certName);
 
-        return s3Client.getCert(certName)
-                .flatMap(is -> {
-                    X509Certificate cert;
-                    try {
-                        CertificateFactory certFactory = CertificateFactory.getInstance("X.509");
-                        cert = (X509Certificate) certFactory.generateCertificate(is);
-                    } catch (CertificateException e) {
-                        log.error(
-                                "retrievePublicKeyFromCert failed, {}, {}",
-                                e.getClass().getName(),
-                                e.getMessage());
-                        throw new StateApiException(StateApiErrorCode.E_INTERNAL_SERVER_ERROR);
-                    }
+        return certificateLoader.loadCertificate(certName).map(cert -> {
+            Date currentDate = new Date();
+            if (currentDate.after(cert.getNotAfter())) {
+                log.error("The certificate {} has expired", certName);
+                throw new StateApiException(StateApiErrorCode.E_CERTIFICATE_EXPIRED);
+            }
 
-                    // Check if the certificate is expired
-                    Date currentDate = new Date();
-                    if (currentDate.after(cert.getNotAfter())) {
-                        log.error("The certificate {} has expired", certName);
-                        throw new StateApiException(StateApiErrorCode.E_CERTIFICATE_EXPIRED);
-                    }
+            if (enforcedExpirationDate != null) {
+                OffsetDateTime currentDateTime = OffsetDateTime.now(ZoneOffset.UTC);
+                if (currentDateTime.isAfter(enforcedExpirationDate)) {
+                    log.error("The certificate {} has passed the IRS enforced expiration date", certName);
+                    throw new StateApiException(StateApiErrorCode.E_CERTIFICATE_EXPIRED);
+                }
+            }
 
-                    // check IRS enforced expiration date
-                    if (enforcedExpirationDate != null) {
-                        OffsetDateTime currentDateTime = OffsetDateTime.now(ZoneOffset.UTC);
-                        if (currentDateTime.isAfter(enforcedExpirationDate)) {
-                            log.error("The certificate {} has passed the IRS enforced expiration date", certName);
-
-                            throw new StateApiException(StateApiErrorCode.E_CERTIFICATE_EXPIRED);
-                        }
-                    }
-                    return Mono.just(cert.getPublicKey());
-                })
-                .cache(); // This is the hack to make @Cacheable work #https://www.baeldung.com/spring-webflux-cacheable
+            return cert.getPublicKey();
+        });
     }
 
     @Cacheable(cacheNames = "stateProfileCache", key = "#accountId")
