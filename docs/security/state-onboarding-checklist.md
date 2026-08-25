@@ -19,6 +19,7 @@ To be complete before Indiana's `state_profile` row is written. Intended to be c
 - [ ] Delivery channel from Indiana DOR to IRS documented, with verification method
 - [ ] `cert_expiration_date` set, and shorter than the certificate's own `notAfter`
 - [ ] Revocation SLA agreed with Indiana; targeted cache eviction path exists
+  (`CertificateLoader.evictCertificate(String certName)` exists; wiring it to an authenticated trigger — an admin endpoint, an actuator, or an operational runbook — is still an open decision, not yet made.)
 - [ ] Rotation cadence and owner recorded
 - [ ] Production startup assertion that `cert-location-override` is unset
 

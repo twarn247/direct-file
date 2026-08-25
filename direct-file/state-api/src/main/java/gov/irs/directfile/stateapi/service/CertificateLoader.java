@@ -5,6 +5,7 @@ import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
@@ -51,5 +52,15 @@ public class CertificateLoader {
                     }
                 })
                 .cache(); // required for @Cacheable over a Mono
+    }
+
+    /**
+     * Evicts one certificate by name from the cache. This is the targeted revocation
+     * path: replacing the S3 object alone does nothing until the cache TTL expires
+     * (spring.cache.TTL-minutes, default 120) or this is called for that certName.
+     */
+    @CacheEvict(cacheNames = "certificateCache", key = "#certName")
+    public void evictCertificate(String certName) {
+        log.info("evicted certificate {} from certificateCache", certName);
     }
 }
