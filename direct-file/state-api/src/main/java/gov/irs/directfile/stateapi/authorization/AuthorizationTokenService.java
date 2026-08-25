@@ -26,11 +26,12 @@ public class AuthorizationTokenService {
     private final String signingKey;
 
     /**
-     * The HS256 key that signs state export tokens. This value was published in this
-     * repository's git history (application-development.yaml). Any deployment still
-     * using it must rotate before serving traffic, so the constructor refuses it.
+     * HS256 keys that have been published in this repository's git history at some
+     * point (application-development.yaml, then docker-compose.yaml's local-dev
+     * default). Any deployment using one of these must rotate before serving traffic.
      */
-    private static final String PUBLISHED_DEVELOPMENT_KEY = "GTc+SlI7C7ECPHAhAvIWqn2yAvzAGMVj";
+    private static final Set<String> KNOWN_COMMITTED_KEYS =
+            Set.of("GTc+SlI7C7ECPHAhAvIWqn2yAvzAGMVj", "1636cee96199ae396c208e65c86a1b21");
 
     private static final int MIN_SIGNING_KEY_BYTES = 32; // HS256 requires >= 256 bits
 
@@ -46,9 +47,9 @@ public class AuthorizationTokenService {
             throw new IllegalStateException(
                     "authorization-token.signing-key must be at least " + MIN_SIGNING_KEY_BYTES + " bytes for HS256.");
         }
-        if (PUBLISHED_DEVELOPMENT_KEY.equals(signingKey)) {
+        if (KNOWN_COMMITTED_KEYS.contains(signingKey)) {
             throw new IllegalStateException(
-                    "authorization-token.signing-key is the key published in this repository's git history. Rotate it.");
+                    "authorization-token.signing-key is a key published in this repository's git history. Rotate it.");
         }
 
         this.dataEncryptDecrypt = dataEncryptDecrypt;

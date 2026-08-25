@@ -231,6 +231,14 @@ public class AuthorizationTokenServiceTest {
     }
 
     @Test
+    public void constructor_rejectsTheDockerComposeDefaultKey() {
+        assertThrows(
+                IllegalStateException.class,
+                () -> new AuthorizationTokenService(
+                        mock(DataEncryptDecrypt.class), "1636cee96199ae396c208e65c86a1b21", 600));
+    }
+
+    @Test
     public void constructor_acceptsAValidKey() {
         assertDoesNotThrow(() -> new AuthorizationTokenService(mock(DataEncryptDecrypt.class), VALID_KEY, 600));
     }
