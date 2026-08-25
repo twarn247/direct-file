@@ -196,7 +196,10 @@ services:
     read_only: true
     environment:
       LOCAL_WRAPPING_KEY: "${LOCAL_WRAPPING_KEY:-oE3Pm+fr1I+YbX2ZxEe/n9INqJjy00KSl7oXXW4p5Xw=}"
-      STATE_API_AUTHORIZATION_TOKEN_SIGNING_KEY: "${STATE_API_AUTHORIZATION_TOKEN_SIGNING_KEY:-1636cee96199ae396c208e65c86a1b21}"
+      # No default: any committed value here would itself become a published key
+      # AuthorizationTokenService's startup guard would then have to reject, the
+      # same problem this variable exists to avoid. Export it before `docker compose up`.
+      STATE_API_AUTHORIZATION_TOKEN_SIGNING_KEY: "${STATE_API_AUTHORIZATION_TOKEN_SIGNING_KEY}"
       SPRING_PROFILES_ACTIVE: development,docker
       STATEAPI_PORT: "${STATEAPI_PORT:-8081}"
       OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"

@@ -35,11 +35,12 @@ Swagger API:  http://localhost:8081/swagger-ui/index.html
 state export JWTs. It has no default and the application refuses to start without it, or with
 a key shorter than 32 bytes, or with a key ever published in this repository's git history.
 
-- `docker-compose.yaml` supplies a local-dev value automatically.
-- Running via `localrun.sh` directly does not set any environment — export
-  `STATE_API_AUTHORIZATION_TOKEN_SIGNING_KEY` yourself first (e.g.
-  `export STATE_API_AUTHORIZATION_TOKEN_SIGNING_KEY=$(openssl rand -hex 16)`) or the
-  application will fail to start.
+Neither `docker-compose.yaml` nor `localrun.sh` sets this for you — export it yourself
+before starting state-api either way (e.g.
+`export STATE_API_AUTHORIZATION_TOKEN_SIGNING_KEY=$(openssl rand -hex 16)`), or the
+application will fail to start. A committed default in `docker-compose.yaml` was
+considered and rejected: any value checked into the repo becomes a published key,
+which `AuthorizationTokenService`'s startup guard exists specifically to refuse.
 
 ## Database migrations
 
