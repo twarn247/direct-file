@@ -915,6 +915,69 @@ public class StateApiServiceImplTest {
     }
 
     @Test
+    public void lookupStateProfile_nullsNonHttpsTransferCancelUrlButKeepsProfile() {
+        StateProfileDTO dto = new StateProfileDTO(
+                "IN",
+                "INfreefile",
+                "https://www.in.gov/dor/",
+                "https://www.in.gov/dor/redirect",
+                "https://www.in.gov/dor/",
+                "https://www.in.gov/dor/individual-income-taxes/",
+                "javascript:alert(1)",
+                "https://www.in.gov/dor/cancel",
+                List.of("https://www.in.gov/dor/redirect"),
+                Map.of("en", "en"),
+                true,
+                null,
+                false);
+        when(cachedDS.getStateProfileByStateCode("IN")).thenReturn(Mono.just(dto));
+
+        StepVerifier.create(service.lookupStateProfile("IN"))
+                .assertNext(result -> assertThat(result.transferCancelUrl()).isNull())
+                .verifyComplete();
+    }
+
+    @Test
+    public void lookupStateProfile_nullsNonHttpsWaitingForAcceptanceCancelUrlButKeepsProfile() {
+        StateProfileDTO dto = new StateProfileDTO(
+                "IN",
+                "INfreefile",
+                "https://www.in.gov/dor/",
+                "https://www.in.gov/dor/redirect",
+                "https://www.in.gov/dor/",
+                "https://www.in.gov/dor/individual-income-taxes/",
+                "https://www.in.gov/dor/cancel",
+                "http://www.in.gov/dor/cancel",
+                List.of("https://www.in.gov/dor/redirect"),
+                Map.of("en", "en"),
+                true,
+                null,
+                false);
+        when(cachedDS.getStateProfileByStateCode("IN")).thenReturn(Mono.just(dto));
+
+        StepVerifier.create(service.lookupStateProfile("IN"))
+                .assertNext(result ->
+                        assertThat(result.waitingForAcceptanceCancelUrl()).isNull())
+                .verifyComplete();
+    }
+
+    @Test
+    public void lookupStateProfile_keepsValidHttpsCancelUrls() {
+        StateProfileDTO dto = stateProfileDtoWith(
+                "https://www.in.gov/dor/",
+                "https://www.in.gov/dor/redirect",
+                List.of("https://www.in.gov/dor/redirect"));
+        when(cachedDS.getStateProfileByStateCode("IN")).thenReturn(Mono.just(dto));
+
+        StepVerifier.create(service.lookupStateProfile("IN"))
+                .assertNext(result -> {
+                    assertThat(result.transferCancelUrl()).isEqualTo("https://www.in.gov/dor/cancel");
+                    assertThat(result.waitingForAcceptanceCancelUrl()).isEqualTo("https://www.in.gov/dor/cancel");
+                })
+                .verifyComplete();
+    }
+
+    @Test
     public void testGetStateProfile_Archived() {
         // given
         String accountId = "the-account-id";

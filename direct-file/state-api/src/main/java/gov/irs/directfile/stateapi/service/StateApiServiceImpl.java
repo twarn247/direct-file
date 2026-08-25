@@ -432,6 +432,9 @@ public class StateApiServiceImpl implements StateApiService {
                     nullIfNotHttps(dto.departmentOfRevenueUrl(), stateCode, "department_of_revenue_url");
             String safeFilingRequirementsUrl =
                     nullIfNotHttps(dto.filingRequirementsUrl(), stateCode, "filing_requirements_url");
+            String safeTransferCancelUrl = nullIfNotHttps(dto.transferCancelUrl(), stateCode, "transfer_cancel_url");
+            String safeWaitingForAcceptanceCancelUrl =
+                    nullIfNotHttps(dto.waitingForAcceptanceCancelUrl(), stateCode, "waiting_for_acceptance_cancel_url");
 
             return new StateProfileDTO(
                     dto.stateCode(),
@@ -440,8 +443,8 @@ public class StateApiServiceImpl implements StateApiService {
                     dto.defaultRedirectUrl(),
                     safeDepartmentOfRevenueUrl,
                     safeFilingRequirementsUrl,
-                    dto.transferCancelUrl(),
-                    dto.waitingForAcceptanceCancelUrl(),
+                    safeTransferCancelUrl,
+                    safeWaitingForAcceptanceCancelUrl,
                     safeRedirects,
                     dto.languages(),
                     dto.acceptedOnly(),
