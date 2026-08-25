@@ -65,8 +65,8 @@ describe(`FileYourStateTaxesDetails`, () => {
     taxSystemName: `FSTSN`,
     acceptedOnly: false,
     customFilingDeadline: null,
-    departmentOfRevenueUrl: `http://www.dor-example-url.example`,
-    filingRequirementsUrl: `http://www.filing-requirements-example-url.example`,
+    departmentOfRevenueUrl: `https://www.dor-example-url.example`,
+    filingRequirementsUrl: `https://www.filing-requirements-example-url.example`,
   };
 
   const fetchStateProfileHookResponse: FetchStateProfileHookResponse = {

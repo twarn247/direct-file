@@ -709,8 +709,8 @@ public class StateApiServiceImplTest {
                                 .containsAll(List.of(stateRedirect1.getRedirectUrl(), stateRedirect2.getRedirectUrl()))
                         && "english".equals(s.languages().get("en"))
                         && "spanish".equals(s.languages().get("es"))
-                        && "url".equals(s.departmentOfRevenueUrl())
-                        && "url".equals(s.filingRequirementsUrl()))
+                        && "https://www.state.gov/dor".equals(s.departmentOfRevenueUrl())
+                        && "https://www.state.gov/filing-requirements".equals(s.filingRequirementsUrl()))
                 .expectComplete()
                 .verify();
     }
@@ -851,6 +851,70 @@ public class StateApiServiceImplTest {
     }
 
     @Test
+    public void lookupStateProfile_nullsNonHttpsDepartmentOfRevenueUrlButKeepsProfile() {
+        StateProfileDTO dto = new StateProfileDTO(
+                "IN",
+                "INfreefile",
+                "https://www.in.gov/dor/",
+                "https://www.in.gov/dor/redirect",
+                "javascript:alert(1)",
+                "https://www.in.gov/dor/individual-income-taxes/",
+                "https://www.in.gov/dor/cancel",
+                "https://www.in.gov/dor/cancel",
+                List.of("https://www.in.gov/dor/redirect"),
+                Map.of("en", "en"),
+                true,
+                null,
+                false);
+        when(cachedDS.getStateProfileByStateCode("IN")).thenReturn(Mono.just(dto));
+
+        StepVerifier.create(service.lookupStateProfile("IN"))
+                .assertNext(
+                        result -> assertThat(result.departmentOfRevenueUrl()).isNull())
+                .verifyComplete();
+    }
+
+    @Test
+    public void lookupStateProfile_nullsNonHttpsFilingRequirementsUrlButKeepsProfile() {
+        StateProfileDTO dto = new StateProfileDTO(
+                "IN",
+                "INfreefile",
+                "https://www.in.gov/dor/",
+                "https://www.in.gov/dor/redirect",
+                "https://www.in.gov/dor/",
+                "http://www.in.gov/dor/individual-income-taxes/",
+                "https://www.in.gov/dor/cancel",
+                "https://www.in.gov/dor/cancel",
+                List.of("https://www.in.gov/dor/redirect"),
+                Map.of("en", "en"),
+                true,
+                null,
+                false);
+        when(cachedDS.getStateProfileByStateCode("IN")).thenReturn(Mono.just(dto));
+
+        StepVerifier.create(service.lookupStateProfile("IN"))
+                .assertNext(result -> assertThat(result.filingRequirementsUrl()).isNull())
+                .verifyComplete();
+    }
+
+    @Test
+    public void lookupStateProfile_keepsValidHttpsDepartmentOfRevenueAndFilingRequirementsUrls() {
+        StateProfileDTO dto = stateProfileDtoWith(
+                "https://www.in.gov/dor/",
+                "https://www.in.gov/dor/redirect",
+                List.of("https://www.in.gov/dor/redirect"));
+        when(cachedDS.getStateProfileByStateCode("IN")).thenReturn(Mono.just(dto));
+
+        StepVerifier.create(service.lookupStateProfile("IN"))
+                .assertNext(result -> {
+                    assertThat(result.departmentOfRevenueUrl()).isEqualTo("https://www.in.gov/dor/");
+                    assertThat(result.filingRequirementsUrl())
+                            .isEqualTo("https://www.in.gov/dor/individual-income-taxes/");
+                })
+                .verifyComplete();
+    }
+
+    @Test
     public void testGetStateProfile_Archived() {
         // given
         String accountId = "the-account-id";
@@ -920,8 +984,8 @@ public class StateApiServiceImplTest {
         sp.setCertLocation("x/y");
         sp.setAcceptedOnly(flag);
         sp.setArchived(false);
-        sp.setDepartmentOfRevenueUrl("url");
-        sp.setFilingRequirementsUrl("url");
+        sp.setDepartmentOfRevenueUrl("https://www.state.gov/dor");
+        sp.setFilingRequirementsUrl("https://www.state.gov/filing-requirements");
         sp.setLandingUrl("https://www.state.gov/landing");
         sp.setDefaultRedirectUrl("https://www.state.gov/redirect");
         return sp;

@@ -1,6 +1,8 @@
 package gov.irs.directfile.stateapi.service;
 
 import java.io.FileNotFoundException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.security.PublicKey;
 import java.security.Security;
 import java.security.cert.CertificateExpiredException;
@@ -416,19 +418,28 @@ public class StateApiServiceImpl implements StateApiService {
                     .filter(StateApiServiceImpl::isHttpsUrl)
                     .toList();
             if (safeRedirects.size() != dto.redirectUrls().size()) {
-                log.error(
+                log.warn(
                         "State {} has {} non-https redirect url(s); they were dropped from the allowlist",
                         stateCode,
                         dto.redirectUrls().size() - safeRedirects.size());
             }
+
+            // Like the redirect allowlist, these two links are filtered rather than
+            // fatal: both client render sites already guard with `stateProfile.field &&`,
+            // so nulling one just means "don't render that link," matching existing
+            // behavior for a state that simply doesn't have that URL configured.
+            String safeDepartmentOfRevenueUrl =
+                    nullIfNotHttps(dto.departmentOfRevenueUrl(), stateCode, "department_of_revenue_url");
+            String safeFilingRequirementsUrl =
+                    nullIfNotHttps(dto.filingRequirementsUrl(), stateCode, "filing_requirements_url");
 
             return new StateProfileDTO(
                     dto.stateCode(),
                     dto.taxSystemName(),
                     dto.landingUrl(),
                     dto.defaultRedirectUrl(),
-                    dto.departmentOfRevenueUrl(),
-                    dto.filingRequirementsUrl(),
+                    safeDepartmentOfRevenueUrl,
+                    safeFilingRequirementsUrl,
                     dto.transferCancelUrl(),
                     dto.waitingForAcceptanceCancelUrl(),
                     safeRedirects,
@@ -437,6 +448,16 @@ public class StateApiServiceImpl implements StateApiService {
                     dto.customFilingDeadline(),
                     dto.archived());
         });
+    }
+
+    private static String nullIfNotHttps(String url, String stateCode, String fieldName) {
+        if (isHttpsUrl(url)) {
+            return url;
+        }
+        if (!StringUtils.isBlank(url)) {
+            log.warn("State {} has a non-https {}; it was dropped", stateCode, fieldName);
+        }
+        return null;
     }
 
     @Override
@@ -487,8 +508,8 @@ public class StateApiServiceImpl implements StateApiService {
             return false;
         }
         try {
-            return "https".equalsIgnoreCase(new java.net.URI(url).getScheme());
-        } catch (java.net.URISyntaxException e) {
+            return "https".equalsIgnoreCase(new URI(url).getScheme());
+        } catch (URISyntaxException e) {
             return false;
         }
     }

@@ -5,6 +5,7 @@ import FileYourStateTaxesStepList from '../FileYourStateTaxesStepList/FileYourSt
 import { CommonLinkRenderer } from 'df-common-link-renderer';
 import Translation from '../Translation/index.js';
 import { StateProfile } from '../../types/StateProfile.js';
+import { parseHttpsUrl } from '../../utils/urlUtils.js';
 
 export type FileYourStateTaxesModalProps = {
   modalRef: RefObject<ModalRef>;
@@ -18,6 +19,9 @@ const FileYourStateTaxesModal = ({ modalRef, stateProfile }: FileYourStateTaxesM
     stateName: t(`enums.statesAndProvinces.${stateProfile.stateCode}`),
     stateTaxSystemName: stateProfile?.taxSystemName,
   };
+
+  const filingRequirementsUrl = parseHttpsUrl(stateProfile.filingRequirementsUrl);
+  const departmentOfRevenueUrl = parseHttpsUrl(stateProfile.departmentOfRevenueUrl);
 
   return (
     <Modal
@@ -34,11 +38,11 @@ const FileYourStateTaxesModal = ({ modalRef, stateProfile }: FileYourStateTaxesM
         />
       </ModalHeading>
       <div className='usa-prose'>
-        {stateProfile.filingRequirementsUrl && ( // Only render this content if we have the link:
+        {filingRequirementsUrl && ( // Only render this content if we have the link:
           <p id='status-info-description'>
             <Trans t={t} i18nKey='taxReturnCard.fileYourStateTaxesDetails.details' />
             {` `}
-            <CommonLinkRenderer url={stateProfile.filingRequirementsUrl}>
+            <CommonLinkRenderer url={filingRequirementsUrl.toString()}>
               <Translation
                 i18nKey='taxReturnCard.fileYourStateTaxesDetails.learnAboutStateFilingRequirementsButtonText'
                 collectionId={null}
@@ -59,11 +63,11 @@ const FileYourStateTaxesModal = ({ modalRef, stateProfile }: FileYourStateTaxesM
           <FileYourStateTaxesStepList />
         </div>
 
-        {stateProfile.departmentOfRevenueUrl && ( // Only render this content if we have the link:
+        {departmentOfRevenueUrl && ( // Only render this content if we have the link:
           <p>
             <Trans t={t} i18nKey='taxReturnCard.fileYourStateTaxesDetails.modalFooter' />
             {` `}
-            <CommonLinkRenderer url={stateProfile.departmentOfRevenueUrl}>
+            <CommonLinkRenderer url={departmentOfRevenueUrl.toString()}>
               <Translation
                 i18nKey='taxReturnCard.fileYourStateTaxesDetails.stateDorSite'
                 collectionId={null}
