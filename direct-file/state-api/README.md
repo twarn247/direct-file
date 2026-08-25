@@ -29,6 +29,18 @@ The `state-api` application will be accessible at http://localhost:8081, and the
 Health check: http://localhost:8081/actuator/health
 Swagger API:  http://localhost:8081/swagger-ui/index.html
 
+## Signing key configuration
+
+`authorization-token.signing-key` (env var `STATE_API_AUTHORIZATION_TOKEN_SIGNING_KEY`) signs
+state export JWTs. It has no default and the application refuses to start without it, or with
+a key shorter than 32 bytes, or with a key ever published in this repository's git history.
+
+- `docker-compose.yaml` supplies a local-dev value automatically.
+- Running via `localrun.sh` directly does not set any environment — export
+  `STATE_API_AUTHORIZATION_TOKEN_SIGNING_KEY` yourself first (e.g.
+  `export STATE_API_AUTHORIZATION_TOKEN_SIGNING_KEY=$(openssl rand -hex 16)`) or the
+  application will fail to start.
+
 ## Database migrations
 
 This app uses the same Liquibase setup as the [backend](../backend) app.
