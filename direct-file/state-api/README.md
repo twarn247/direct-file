@@ -34,6 +34,23 @@ Swagger API:  http://localhost:8081/swagger-ui/index.html
 This app uses the same Liquibase setup as the [backend](../backend) app.
 See the [backend README section for database migrations for more details](../backend/README.md#database-migrations).
 
+## Onboarding a state partner
+
+State profiles are **not** ad-hoc database inserts. Onboarding a state changes which
+certificate authenticates that state's export requests, whether returns not yet
+accepted by the IRS are exportable, and where the authenticated client navigates
+taxpayers — so it goes through review like any code change.
+
+1. Copy `src/main/resources/db/migrations/TEMPLATE-onboard-state.yaml.example` to
+   `src/main/resources/db/migrations/<YYYYMMDDHHMM>-onboard-<state-code>.yaml`.
+2. Fill in every `CHANGE-ME`. All URLs must be `https`.
+3. Upload the state's X.509 certificate to the cert bucket at the `cert_location` key.
+4. Complete `docs/security/state-onboarding-checklist.md` and attach it to the PR.
+5. Get review from someone other than the author.
+
+To take a state offline, set `archived = true` — both profile lookup paths fail closed
+with `E_ACCOUNT_ARCHIVED`.
+
 ## Endpoints
 
 ### Save Authorization Code
