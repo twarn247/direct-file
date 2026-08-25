@@ -28,8 +28,11 @@ const FileYourStateTaxesDetails = () => {
       stateTaxSystemName: stateProfile?.taxSystemName,
     };
 
-    const buildLandingUrl = (urlString: string) => {
-      const url = new URL(urlString);
+    const buildLandingUrl = (urlString: string): string | null => {
+      const url = parseHttpsUrl(urlString);
+      if (!url) {
+        return null;
+      }
       url.searchParams.append(REF_LOCATION, REF_LOCATION_VALUE.HOME);
       return url.toString();
     };
@@ -75,13 +78,15 @@ const FileYourStateTaxesDetails = () => {
 
         <FileYourStateTaxesStepList />
 
-        <CommonLinkRenderer className='usa-button width-full margin-top-3' url={landingUrlWithRefLocationQueryParam}>
-          <Translation
-            i18nKey='taxReturnCard.fileYourStateTaxesDetails.startYourStateTaxesButtonText'
-            collectionId={null}
-            context={context}
-          />
-        </CommonLinkRenderer>
+        {landingUrlWithRefLocationQueryParam && (
+          <CommonLinkRenderer className='usa-button width-full margin-top-3' url={landingUrlWithRefLocationQueryParam}>
+            <Translation
+              i18nKey='taxReturnCard.fileYourStateTaxesDetails.startYourStateTaxesButtonText'
+              collectionId={null}
+              context={context}
+            />
+          </CommonLinkRenderer>
+        )}
       </div>
     );
   }

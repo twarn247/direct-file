@@ -8,6 +8,7 @@ import useFact from '../../../hooks/useFact.js';
 import { Path } from '../../../flow/Path.js';
 import { REF_LOCATION, REF_LOCATION_VALUE } from '../../../constants/pageConstants.js';
 import Translation from '../../Translation/index.js';
+import { parseHttpsUrl } from '../../../utils/urlUtils.js';
 
 export type StateTaxReminderAlertProps = {
   stateProfile: StateProfile;
@@ -49,7 +50,10 @@ const StateTaxReminderAlert = ({ stateProfile, taxYear }: StateTaxReminderAlertP
   }
 
   const addQueryParams = (landingUrl: string) => {
-    const asUrl = new URL(landingUrl);
+    const asUrl = parseHttpsUrl(landingUrl);
+    if (!asUrl) {
+      return null;
+    }
     asUrl.searchParams.append(REF_LOCATION, REF_LOCATION_VALUE.SUBMISSION);
     return asUrl.toString();
   };
@@ -57,7 +61,7 @@ const StateTaxReminderAlert = ({ stateProfile, taxYear }: StateTaxReminderAlertP
     if (stateCanTransferData) {
       return `/file-your-state-taxes`;
     }
-    return addQueryParams(landingUrl);
+    return addQueryParams(landingUrl) ?? `/file-your-state-taxes`;
   };
 
   const stateTaxesLink = <a href={`#${stateTaxesId}`} />;
