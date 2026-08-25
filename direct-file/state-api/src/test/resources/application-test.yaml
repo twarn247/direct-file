@@ -15,7 +15,7 @@ direct-file:
     enabled: true
     mock: true
     url: http://localhost:8080/
-  cert-location-override: unexpired.cer
+  cert-location-override: fakestate.cer
 
 authorization-token:
   # Use a valid test key (not the published development key)
