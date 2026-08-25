@@ -281,13 +281,10 @@ public class StateApiController implements StateApi {
     private String getStateCode(HttpServletRequest request) {
 
         String stateInfo = request.getHeader(X_HEADER);
-        String stateCd = "";
-        // if (stateInfo != null && !stateInfo.isEmpty()) {
-        if (StringUtils.isNotBlank(stateInfo)) {
-            stateCd = stateInfo.substring(0, 2);
-        } else {
-            log.info(X_HEADER + " does not exist or is empty");
+        if (StringUtils.isBlank(stateInfo) || stateInfo.length() < 2) {
+            log.info(X_HEADER + " does not exist, is empty, or is too short to contain a state code");
+            return "";
         }
-        return stateCd;
+        return stateInfo.substring(0, 2);
     }
 }

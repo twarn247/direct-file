@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import gov.irs.directfile.stateapi.model.AesGcmEncryptionResult;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 // cover unit tests for Encryptor and Decryptor
 public class CryptorTest {
@@ -67,6 +68,22 @@ public class CryptorTest {
         byte[] decryptedXml = Decryptor.aesGcmDecrypt(result.ciphertext(), key, iv, result.authenticationTag());
 
         assertThat(new String(decryptedXml)).isEqualTo(xmlData);
+    }
+
+    @Test
+    public void aesGcmEncrypt_rejectsWrongKeyLength() {
+        byte[] shortKey = new byte[16];
+        byte[] iv = new byte[12];
+
+        assertThrows(IllegalArgumentException.class, () -> Encryptor.aesGcmEncrypt("payload", shortKey, iv));
+    }
+
+    @Test
+    public void aesGcmEncrypt_rejectsWrongIvLength() throws Exception {
+        byte[] key = Encryptor.generatePassword();
+        byte[] shortIv = new byte[8];
+
+        assertThrows(IllegalArgumentException.class, () -> Encryptor.aesGcmEncrypt("payload", key, shortIv));
     }
 
     private PublicKey getPublicKey(String certFilePath) throws Exception {
