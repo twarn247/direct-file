@@ -274,7 +274,15 @@ public class StateApiServiceImpl implements StateApiService {
                 throw new StateApiException(StateApiErrorCode.E_AUTHORIZATION_CODE_EXPIRED);
             }
 
-            return Mono.just(ac);
+            // Redeem atomically. The conditional UPDATE is the concurrency control: exactly
+            // one caller can observe a row count of 1 for a given code.
+            return acRepo.markRedeemed(ac.getAuthorizationCode()).flatMap(rowsUpdated -> {
+                if (rowsUpdated == 0) {
+                    log.error("authorize() failed, authorization code has already been redeemed");
+                    return Mono.error(new StateApiException(StateApiErrorCode.E_AUTHORIZATION_CODE_ALREADY_REDEEMED));
+                }
+                return Mono.just(ac);
+            });
         });
     }
 

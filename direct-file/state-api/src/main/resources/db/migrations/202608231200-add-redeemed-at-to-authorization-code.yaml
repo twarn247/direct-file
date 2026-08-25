@@ -1,0 +1,17 @@
+databaseChangeLog:
+  - changeSet:
+      id: authorization-code-add-redeemed-at
+      author: directfile
+      changes:
+        - addColumn:
+            tableName: authorization_code
+            columns:
+              - column:
+                  name: redeemed_at
+                  type: timestamp
+                  constraints:
+                    nullable: true
+      rollback:
+        - dropColumn:
+            tableName: authorization_code
+            columnName: redeemed_at

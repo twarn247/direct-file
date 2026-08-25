@@ -6,6 +6,7 @@ import java.security.Security;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -208,6 +209,7 @@ public class StateApiServiceImplTest {
         StateAndAuthCode saCode = new StateAndAuthCode(authorizationCode.toString(), "FS");
 
         when(acRepo.getByAuthorizationCode(ac.getAuthorizationCode())).thenReturn(Mono.just(ac));
+        when(acRepo.markRedeemed(ac.getAuthorizationCode())).thenReturn(Mono.just(1));
 
         Mono<AuthorizationCode> entityMono = service.authorize(saCode);
 
@@ -252,6 +254,74 @@ public class StateApiServiceImplTest {
         Mono<AuthorizationCode> entityMono = service.authorize(saCode);
 
         StepVerifier.create(entityMono).expectError(StateApiException.class).verify();
+    }
+
+    private AuthorizationCode unexpiredCodeFor(UUID code, String stateCode) {
+        AuthorizationCode ac = new AuthorizationCode();
+        ac.setAuthorizationCode(code);
+        ac.setStateCode(stateCode);
+        ac.setTaxYear(2024);
+        ac.setTaxReturnUuid(UUID.randomUUID());
+        ac.setSubmissionId(SUBMISSION_ID);
+        ac.setExpiresAt(Timestamp.from(Instant.now().plusSeconds(600)));
+        return ac;
+    }
+
+    @Test
+    public void authorize_marksCodeRedeemedOnSuccess() {
+        UUID code = UUID.randomUUID();
+        AuthorizationCode ac = unexpiredCodeFor(code, "IN");
+        when(acRepo.getByAuthorizationCode(ac.getAuthorizationCode())).thenReturn(Mono.just(ac));
+        when(acRepo.markRedeemed(ac.getAuthorizationCode())).thenReturn(Mono.just(1));
+
+        StepVerifier.create(service.authorize(new StateAndAuthCode(code.toString(), "IN")))
+                .assertNext(result -> assertThat(result.getStateCode()).isEqualTo("IN"))
+                .verifyComplete();
+
+        Mockito.verify(acRepo).markRedeemed(ac.getAuthorizationCode());
+    }
+
+    @Test
+    public void authorize_rejectsAlreadyRedeemedCode() {
+        UUID code = UUID.randomUUID();
+        AuthorizationCode ac = unexpiredCodeFor(code, "IN");
+        when(acRepo.getByAuthorizationCode(ac.getAuthorizationCode())).thenReturn(Mono.just(ac));
+        // 0 rows updated: another exchange already redeemed it.
+        when(acRepo.markRedeemed(ac.getAuthorizationCode())).thenReturn(Mono.just(0));
+
+        StepVerifier.create(service.authorize(new StateAndAuthCode(code.toString(), "IN")))
+                .expectErrorMatches(e -> e instanceof StateApiException sae
+                        && sae.getErrorCode() == StateApiErrorCode.E_AUTHORIZATION_CODE_ALREADY_REDEEMED)
+                .verify();
+    }
+
+    @Test
+    public void authorize_doesNotRedeemOnStateCodeMismatch() {
+        UUID code = UUID.randomUUID();
+        AuthorizationCode ac = unexpiredCodeFor(code, "AZ");
+        when(acRepo.getByAuthorizationCode(ac.getAuthorizationCode())).thenReturn(Mono.just(ac));
+
+        StepVerifier.create(service.authorize(new StateAndAuthCode(code.toString(), "IN")))
+                .expectErrorMatches(e -> e instanceof StateApiException sae
+                        && sae.getErrorCode() == StateApiErrorCode.E_MISMATCHED_STATE_CODE)
+                .verify();
+
+        Mockito.verify(acRepo, Mockito.never()).markRedeemed(any());
+    }
+
+    @Test
+    public void authorize_doesNotRedeemAnExpiredCode() {
+        UUID code = UUID.randomUUID();
+        AuthorizationCode ac = unexpiredCodeFor(code, "IN");
+        ac.setExpiresAt(Timestamp.from(Instant.now().minusSeconds(1)));
+        when(acRepo.getByAuthorizationCode(ac.getAuthorizationCode())).thenReturn(Mono.just(ac));
+
+        StepVerifier.create(service.authorize(new StateAndAuthCode(code.toString(), "IN")))
+                .expectErrorMatches(e -> e instanceof StateApiException sae
+                        && sae.getErrorCode() == StateApiErrorCode.E_AUTHORIZATION_CODE_EXPIRED)
+                .verify();
+
+        Mockito.verify(acRepo, Mockito.never()).markRedeemed(any());
     }
 
     // Tests for authorization token
