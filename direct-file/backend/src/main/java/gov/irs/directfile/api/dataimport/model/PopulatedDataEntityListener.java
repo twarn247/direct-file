@@ -36,7 +36,7 @@ public class PopulatedDataEntityListener {
             JsonNode jsonNode;
             jsonNode = objectMapper.readTree(decrypted);
             populatedData.setData(jsonNode);
-        } catch (EncryptionContextMismatchException e) {
+        } catch (EncryptionContextMismatchException e) { // NOPMD - intentionally empty, see comment below
             // A blob in this column is tagged with some other purpose. DataEncryptDecrypt.refuse
             // already logged this under its own marker before throwing, so there's nothing to add
             // here beyond leaving the field unset — this catch exists only so the mismatch doesn't
