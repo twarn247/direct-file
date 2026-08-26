@@ -21,6 +21,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import reactor.test.StepVerifier;
 
 import gov.irs.directfile.models.encryption.DataEncryptDecrypt;
+import gov.irs.directfile.models.encryption.EncryptionPurpose;
 import gov.irs.directfile.stateapi.model.AuthCodeRequest;
 
 import static gov.irs.directfile.stateapi.authorization.AuthorizationTokenService.EXPORT_CLAIM_KEY;
@@ -77,7 +78,7 @@ public class AuthorizationTokenServiceTest {
                 .block());
 
         // then
-        verify(dataEncryptDecrypt).encrypt(any(), any());
+        verify(dataEncryptDecrypt).encrypt(any(), any(), any());
     }
 
     @Test
@@ -91,15 +92,15 @@ public class AuthorizationTokenServiceTest {
         // when
         // NOTE: We aren't stubbing the encryptor's return value, so a NullPointerException will be thrown.
         // That's ok because we're not testing what the encryptor returns,
-        // we're just testing that an encryption context is passed into the encryptor
+        // we're just testing that an encryption purpose is passed into the encryptor
         assertThrows(NullPointerException.class, () -> authorizationTokenService
                 .generateAndEncrypt(authorizationTokenClaims)
                 .block());
-        ArgumentCaptor<Map<String, String>> encryptionContextCaptor = ArgumentCaptor.captor();
+        ArgumentCaptor<EncryptionPurpose> purposeCaptor = ArgumentCaptor.captor();
 
         // then
-        verify(dataEncryptDecrypt).encrypt(any(), encryptionContextCaptor.capture());
-        assertEquals(Map.of("system", "DIRECT-FILE", "type", "STATE-API"), encryptionContextCaptor.getValue());
+        verify(dataEncryptDecrypt).encrypt(any(), purposeCaptor.capture(), any());
+        assertEquals(EncryptionPurpose.STATE_EXPORT_TOKEN, purposeCaptor.getValue());
     }
 
     @Test
@@ -109,7 +110,7 @@ public class AuthorizationTokenServiceTest {
         AuthorizationTokenService authorizationTokenService = initializeService(dataEncryptDecrypt);
 
         // when
-        when(dataEncryptDecrypt.encrypt(any(), any())).thenThrow(AwsCryptoException.class);
+        when(dataEncryptDecrypt.encrypt(any(), any(), any())).thenThrow(AwsCryptoException.class);
         AuthorizationTokenClaims claimsMap = setupClaims();
 
         // then
@@ -125,14 +126,14 @@ public class AuthorizationTokenServiceTest {
         AuthorizationTokenService authorizationTokenService = initializeService(dataEncryptDecrypt);
         AuthorizationTokenClaims tokenClaims = setupClaims();
         byte[] signedJwtBytes = setupSignedJwt(tokenClaims);
-        when(dataEncryptDecrypt.encrypt(any(), any())).thenReturn(signedJwtBytes);
+        when(dataEncryptDecrypt.encrypt(any(), any(), any())).thenReturn(signedJwtBytes);
 
         // when
         authorizationTokenService.generateAndEncrypt(tokenClaims).block();
 
         // then
         ArgumentCaptor<byte[]> signedTokenCaptor = ArgumentCaptor.captor();
-        verify(dataEncryptDecrypt).encrypt(signedTokenCaptor.capture(), anyMap());
+        verify(dataEncryptDecrypt).encrypt(signedTokenCaptor.capture(), any(), any());
         byte[] signedTokenArgument = signedTokenCaptor.getValue();
         try {
             JWSVerifier signatureVerifier = new MACVerifier(VALID_KEY);
@@ -154,14 +155,14 @@ public class AuthorizationTokenServiceTest {
         // given
         AuthorizationTokenClaims tokenClaims = setupClaims();
         byte[] signedJwtBytes = setupSignedJwt(tokenClaims);
-        when(dataEncryptDecrypt.encrypt(any(), any())).thenReturn(signedJwtBytes);
+        when(dataEncryptDecrypt.encrypt(any(), any(), any())).thenReturn(signedJwtBytes);
 
         // when
         authorizationTokenService.generateAndEncrypt(tokenClaims).block();
 
         // then
         ArgumentCaptor<byte[]> signedTokenCaptor = ArgumentCaptor.captor();
-        verify(dataEncryptDecrypt).encrypt(signedTokenCaptor.capture(), anyMap());
+        verify(dataEncryptDecrypt).encrypt(signedTokenCaptor.capture(), any(), any());
 
         byte[] signedTokenArgument = signedTokenCaptor.getValue();
         try {
@@ -185,14 +186,14 @@ public class AuthorizationTokenServiceTest {
         // given
         AuthorizationTokenClaims tokenClaims = setupClaims();
         byte[] signedJwtBytes = setupSignedJwt(tokenClaims);
-        when(dataEncryptDecrypt.encrypt(any(), any())).thenReturn(signedJwtBytes);
+        when(dataEncryptDecrypt.encrypt(any(), any(), any())).thenReturn(signedJwtBytes);
 
         // when
         authorizationTokenService.generateAndEncrypt(tokenClaims).block();
 
         // then
         ArgumentCaptor<byte[]> signedTokenCaptor = ArgumentCaptor.captor();
-        verify(dataEncryptDecrypt).encrypt(signedTokenCaptor.capture(), anyMap());
+        verify(dataEncryptDecrypt).encrypt(signedTokenCaptor.capture(), any(), any());
 
         byte[] signedTokenArgument = signedTokenCaptor.getValue();
         try {

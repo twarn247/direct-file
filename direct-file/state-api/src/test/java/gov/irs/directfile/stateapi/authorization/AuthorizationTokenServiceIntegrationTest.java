@@ -18,8 +18,11 @@ import org.springframework.test.context.ActiveProfiles;
 import reactor.test.StepVerifier;
 
 import gov.irs.directfile.models.encryption.DataEncryptDecrypt;
+import gov.irs.directfile.models.encryption.EncryptionContextMismatchException;
+import gov.irs.directfile.models.encryption.EncryptionPurpose;
 import gov.irs.directfile.stateapi.model.AuthCodeRequest;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -45,7 +48,7 @@ public class AuthorizationTokenServiceIntegrationTest {
                     try {
                         // when
                         byte[] ciphertext = Base64.getUrlDecoder().decode(token);
-                        byte[] decrypted = dataEncryptDecrypt.decrypt(ciphertext);
+                        byte[] decrypted = dataEncryptDecrypt.decrypt(ciphertext, EncryptionPurpose.STATE_EXPORT_TOKEN);
                         SignedJWSParts signedJWSParts = mapper.readValue(decrypted, SignedJWSParts.class);
                         String signedJWS =
                                 String.join(".", signedJWSParts.s1(), signedJWSParts.s2(), signedJWSParts.s3());
@@ -81,7 +84,7 @@ public class AuthorizationTokenServiceIntegrationTest {
                         // when
                         JWSVerifier signatureVerifier = new MACVerifier("0123456789abcdef0123456789abcdef");
                         byte[] ciphertext = Base64.getUrlDecoder().decode(token);
-                        byte[] decrypted = dataEncryptDecrypt.decrypt(ciphertext);
+                        byte[] decrypted = dataEncryptDecrypt.decrypt(ciphertext, EncryptionPurpose.STATE_EXPORT_TOKEN);
                         SignedJWSParts signedJWSParts = mapper.readValue(decrypted, SignedJWSParts.class);
                         String signedJWS =
                                 String.join(".", signedJWSParts.s1(), signedJWSParts.s2(), signedJWSParts.s3());
@@ -93,6 +96,23 @@ public class AuthorizationTokenServiceIntegrationTest {
                     } catch (ParseException | JOSEException | IOException e) {
                         throw new RuntimeException(e);
                     }
+                })
+                .expectComplete()
+                .verify();
+    }
+
+    @Test
+    public void givenAnExportToken_whenReadAsTaxReturnFacts_thenItIsRejected() {
+        AuthCodeRequest authCodeRequest =
+                new AuthCodeRequest(UUID.randomUUID(), "123-00-4567", 2023, "MA", "123456789AB");
+        AuthorizationTokenClaims claimsMap = mapper.convertValue(authCodeRequest, AuthorizationTokenClaims.class);
+
+        StepVerifier.create(authorizationTokenService.generateAndEncrypt(claimsMap))
+                .assertNext((token) -> {
+                    byte[] ciphertext = Base64.getUrlDecoder().decode(token);
+                    assertThrows(
+                            EncryptionContextMismatchException.class,
+                            () -> dataEncryptDecrypt.decrypt(ciphertext, EncryptionPurpose.TAX_RETURN_FACTS));
                 })
                 .expectComplete()
                 .verify();

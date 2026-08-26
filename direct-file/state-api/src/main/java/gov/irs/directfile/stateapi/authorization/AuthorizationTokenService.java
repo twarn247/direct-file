@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
 import gov.irs.directfile.models.encryption.DataEncryptDecrypt;
+import gov.irs.directfile.models.encryption.EncryptionPurpose;
 
 @Slf4j
 @Service
@@ -91,11 +92,7 @@ public class AuthorizationTokenService {
     }
 
     private String encryptToken(byte[] claims) {
-        Map<String, String> encryptionContext = new HashMap<>();
-        encryptionContext.put("system", "DIRECT-FILE");
-        encryptionContext.put("type", "STATE-API");
-
-        byte[] ciphertext = dataEncryptDecrypt.encrypt(claims, encryptionContext);
+        byte[] ciphertext = dataEncryptDecrypt.encrypt(claims, EncryptionPurpose.STATE_EXPORT_TOKEN, null);
         return Base64.getUrlEncoder().encodeToString(ciphertext);
     }
 }
