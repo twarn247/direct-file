@@ -23,6 +23,7 @@ import gov.irs.directfile.api.user.models.User;
 import gov.irs.directfile.api.util.base.BaseRepositoryTest;
 import gov.irs.directfile.models.FactTypeWithItem;
 import gov.irs.directfile.models.encryption.DataEncryptDecrypt;
+import gov.irs.directfile.models.encryption.EncryptionPurpose;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -173,8 +174,10 @@ class TaxReturnRepositoryTest extends BaseRepositoryTest {
         TaxReturn taxReturn = TaxReturn.testObjectFactoryNoId();
         taxReturn.setFacts(Map.of("testA", new FactTypeWithItem("typeA", new IntNode(24))));
         byte[] factsBytes = objectMapper.writeValueAsBytes(taxReturn.getFacts());
-        when(dataEncryptDecrypt.encrypt(eq(factsBytes), anyMap())).thenReturn(factsBytes);
-        when(dataEncryptDecrypt.decrypt(factsBytes)).thenReturn(factsBytes);
+        when(dataEncryptDecrypt.encrypt(eq(factsBytes), any(EncryptionPurpose.class), any()))
+                .thenReturn(factsBytes);
+        when(dataEncryptDecrypt.decrypt(eq(factsBytes), any(EncryptionPurpose.class)))
+                .thenReturn(factsBytes);
         user.addTaxReturn(taxReturn);
         entityManager.persist(taxReturn);
 

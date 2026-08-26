@@ -38,9 +38,9 @@ import gov.irs.directfile.api.user.models.User;
 import gov.irs.directfile.api.util.base.BaseRepositoryTest;
 import gov.irs.directfile.models.FactTypeWithItem;
 import gov.irs.directfile.models.encryption.DataEncryptDecrypt;
+import gov.irs.directfile.models.encryption.EncryptionPurpose;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
@@ -136,8 +136,10 @@ public class PDFBackfillToS3HandlerTest extends BaseRepositoryTest {
         TaxReturn taxReturn = TaxReturn.testObjectFactoryNoId(march20_2024);
         taxReturn.setFacts(Map.of("testA", new FactTypeWithItem("typeA", new IntNode(24))));
         byte[] factsBytes = objectMapper.writeValueAsBytes(taxReturn.getFacts());
-        when(dataEncryptDecrypt.encrypt(eq(factsBytes), anyMap())).thenReturn(factsBytes);
-        when(dataEncryptDecrypt.decrypt(factsBytes)).thenReturn(factsBytes);
+        when(dataEncryptDecrypt.encrypt(eq(factsBytes), any(EncryptionPurpose.class), any()))
+                .thenReturn(factsBytes);
+        when(dataEncryptDecrypt.decrypt(eq(factsBytes), any(EncryptionPurpose.class)))
+                .thenReturn(factsBytes);
         user.addTaxReturn(taxReturn);
         TaxReturn t = entityManager.persist(taxReturn);
 
@@ -148,8 +150,10 @@ public class PDFBackfillToS3HandlerTest extends BaseRepositoryTest {
         TaxReturn taxReturn2 = TaxReturn.testObjectFactoryNoId(march20_2024);
         taxReturn.setFacts(Map.of("testA", new FactTypeWithItem("typeA", new IntNode(24))));
         byte[] factsBytes2 = objectMapper.writeValueAsBytes(taxReturn2.getFacts());
-        when(dataEncryptDecrypt.encrypt(eq(factsBytes2), anyMap())).thenReturn(factsBytes2);
-        when(dataEncryptDecrypt.decrypt(factsBytes2)).thenReturn(factsBytes2);
+        when(dataEncryptDecrypt.encrypt(eq(factsBytes2), any(EncryptionPurpose.class), any()))
+                .thenReturn(factsBytes2);
+        when(dataEncryptDecrypt.decrypt(eq(factsBytes2), any(EncryptionPurpose.class)))
+                .thenReturn(factsBytes2);
         user2.addTaxReturn(taxReturn2);
         entityManager.persist(taxReturn2);
 
@@ -178,8 +182,10 @@ public class PDFBackfillToS3HandlerTest extends BaseRepositoryTest {
         taxReturn.setFacts(Map.of("testA", new FactTypeWithItem("typeA", new IntNode(24))));
 
         byte[] factsBytes = objectMapper.writeValueAsBytes(taxReturn.getFacts());
-        when(dataEncryptDecrypt.encrypt(eq(factsBytes), anyMap())).thenReturn(factsBytes);
-        when(dataEncryptDecrypt.decrypt(factsBytes)).thenReturn(factsBytes);
+        when(dataEncryptDecrypt.encrypt(eq(factsBytes), any(EncryptionPurpose.class), any()))
+                .thenReturn(factsBytes);
+        when(dataEncryptDecrypt.decrypt(eq(factsBytes), any(EncryptionPurpose.class)))
+                .thenReturn(factsBytes);
         user.addTaxReturn(taxReturn);
         entityManager.persist(taxReturn);
 
@@ -190,8 +196,10 @@ public class PDFBackfillToS3HandlerTest extends BaseRepositoryTest {
         TaxReturn taxReturn2 = TaxReturn.testObjectFactoryNoId();
         taxReturn.setFacts(Map.of("testA", new FactTypeWithItem("typeA", new IntNode(24))));
         byte[] factsBytes2 = objectMapper.writeValueAsBytes(taxReturn2.getFacts());
-        when(dataEncryptDecrypt.encrypt(eq(factsBytes2), anyMap())).thenReturn(factsBytes2);
-        when(dataEncryptDecrypt.decrypt(factsBytes2)).thenReturn(factsBytes2);
+        when(dataEncryptDecrypt.encrypt(eq(factsBytes2), any(EncryptionPurpose.class), any()))
+                .thenReturn(factsBytes2);
+        when(dataEncryptDecrypt.decrypt(eq(factsBytes2), any(EncryptionPurpose.class)))
+                .thenReturn(factsBytes2);
         user2.addTaxReturn(taxReturn2);
         entityManager.persist(taxReturn2);
 

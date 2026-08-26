@@ -1,8 +1,5 @@
 package gov.irs.directfile.api.taxreturn.models;
 
-import java.util.HashMap;
-import java.util.Map;
-
 import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import jakarta.persistence.PostLoad;
@@ -15,6 +12,7 @@ import gov.irs.directfile.api.authentication.NullAuthenticationException;
 import gov.irs.directfile.api.config.identity.IdentityAttributes;
 import gov.irs.directfile.api.config.identity.IdentitySupplier;
 import gov.irs.directfile.models.encryption.DataEncryptDecrypt;
+import gov.irs.directfile.models.encryption.EncryptionPurpose;
 import gov.irs.directfile.models.encryption.FactsEncryptor;
 import gov.irs.directfile.models.encryption.GenericStringEncryptor;
 
@@ -35,27 +33,27 @@ public class TaxReturnEntityListener {
 
     @PostLoad
     public <T extends TaxReturnEntity> void decryptColumns(T taxReturn) {
-        taxReturn.setFactsWithoutDirtyingEntity(
-                factsEncryptor.convertToEntityAttribute(taxReturn.getFactsCipherText()));
-        taxReturn.setStoreWithoutDirtyingEntity(
-                genericStringEncryptor.convertToEntityAttribute(taxReturn.getStoreCipherText()));
+        taxReturn.setFactsWithoutDirtyingEntity(factsEncryptor.convertToEntityAttribute(
+                taxReturn.getFactsCipherText(), EncryptionPurpose.TAX_RETURN_FACTS));
+        taxReturn.setStoreWithoutDirtyingEntity(genericStringEncryptor.convertToEntityAttribute(
+                taxReturn.getStoreCipherText(), EncryptionPurpose.TAX_RETURN_STORE));
     }
 
     @PrePersist
     @PreUpdate
     public <T extends TaxReturnEntity> void encryptColumns(T taxReturn) {
-        Map<String, String> encryptionContext = new HashMap<>();
+        String actorId;
         try {
             IdentityAttributes identityAttributes = identitySupplier.get();
-            encryptionContext.put("id", identityAttributes.externalId().toString());
+            actorId = identityAttributes.externalId().toString();
         } catch (NullAuthenticationException e) {
             // this write was triggered by a system event (e.g. sqs message handler)
-            encryptionContext.put("system", "DIRECTFILE");
-            encryptionContext.put("type", "API");
+            actorId = null;
         }
 
-        taxReturn.setFactsCipherText(factsEncryptor.convertToDatabaseColumn(taxReturn.getFacts(), encryptionContext));
-        taxReturn.setStoreCipherText(
-                genericStringEncryptor.convertToDatabaseColumn(taxReturn.getStore(), encryptionContext));
+        taxReturn.setFactsCipherText(factsEncryptor.convertToDatabaseColumn(
+                taxReturn.getFacts(), EncryptionPurpose.TAX_RETURN_FACTS, actorId));
+        taxReturn.setStoreCipherText(genericStringEncryptor.convertToDatabaseColumn(
+                taxReturn.getStore(), EncryptionPurpose.TAX_RETURN_STORE, actorId));
     }
 }
