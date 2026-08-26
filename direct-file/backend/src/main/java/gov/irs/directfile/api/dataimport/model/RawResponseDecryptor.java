@@ -31,13 +31,10 @@ public class RawResponseDecryptor {
 
             return objectMapper.readTree(decrypted);
         } catch (EncryptionContextMismatchException e) {
-            // A blob in this column is tagged with some other purpose. Decryption was refused and
-            // the plaintext discarded; surfaced under its own marker so it is not lost among parse
-            // failures. Behavior is otherwise unchanged: the field stays unset.
-            log.error(
-                    "{}: refused to decrypt data column in populated_data. Error: {}",
-                    EncryptionContextMismatchException.MARKER,
-                    e.getMessage());
+            // A blob in this column is tagged with some other purpose. DataEncryptDecrypt.refuse
+            // already logged this under its own marker before throwing, so there's nothing to add
+            // here beyond leaving the field unset — this catch exists only so the mismatch doesn't
+            // fall into the generic catch-all below and get logged as an ordinary parse failure.
         } catch (Exception e) {
             log.error(
                     "Failed to decrypt / parse data column in populated_data. Exception: {}. Error: {}",

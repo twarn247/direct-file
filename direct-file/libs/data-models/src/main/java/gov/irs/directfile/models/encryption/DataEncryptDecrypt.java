@@ -91,9 +91,7 @@ public class DataEncryptDecrypt {
 
         if (found == null) {
             if (untaggedPolicy == UntaggedPolicy.REJECT) {
-                return refuse(
-                        plaintext,
-                        "ciphertext carries no encryption context purpose; expected " + expected.wireValue());
+                return refuse(plaintext, expected, null);
             }
             if (untaggedPolicy == UntaggedPolicy.REPORT) {
                 reportLegacy(expected);
@@ -102,15 +100,33 @@ public class DataEncryptDecrypt {
         }
 
         if (!found.equals(expected.wireValue())) {
-            return refuse(
-                    plaintext,
-                    "encryption context purpose mismatch: expected " + expected.wireValue() + ", found " + found);
+            return refuse(plaintext, expected, found);
         }
 
         return plaintext;
     }
 
-    private byte[] refuse(byte[] plaintext, String message) {
+    /**
+     * Refuses a decrypted plaintext whose bound purpose did not match. Zeroes the plaintext, logs
+     * the stable {@link EncryptionContextMismatchException#MARKER} once here — the single place
+     * every refusal passes through, so the marker fires for every purpose this codebase verifies,
+     * not just the callers that happen to add their own catch — and throws.
+     *
+     * <p>{@code found} is null for "no purpose bound at all" (rejected only under enforce mode)
+     * and a string for "bound to some other purpose" (rejected in every mode). Sanitized through
+     * {@link EncryptionPurpose#fromWireValue} before it ever reaches a log line or an exception
+     * message: it was read out of the ciphertext's context, which this class does not otherwise
+     * treat as trusted input.
+     */
+    private byte[] refuse(byte[] plaintext, EncryptionPurpose expected, String found) {
+        String safeFound = found == null
+                ? "<none>"
+                : EncryptionPurpose.fromWireValue(found)
+                        .map(EncryptionPurpose::wireValue)
+                        .orElse("<unrecognized>");
+        String message =
+                "encryption context purpose mismatch: expected " + expected.wireValue() + ", found " + safeFound;
+        log.error("{}: {}", EncryptionContextMismatchException.MARKER, message);
         Arrays.fill(plaintext, (byte) 0);
         throw new EncryptionContextMismatchException(message);
     }

@@ -161,4 +161,29 @@ public class DataEncryptDecryptTest {
                 .hasMessageContaining("tax-return-store")
                 .hasMessageNotContaining("actor-1");
     }
+
+    @Test
+    void refusalLogsTheMismatchMarker() {
+        DataEncryptDecrypt subject = subject("warn");
+        ch.qos.logback.classic.Logger logger =
+                (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(DataEncryptDecrypt.class);
+        ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent> appender =
+                new ch.qos.logback.core.read.ListAppender<>();
+        appender.setContext((ch.qos.logback.classic.LoggerContext) org.slf4j.LoggerFactory.getILoggerFactory());
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            byte[] ciphertext = subject.encrypt(PLAINTEXT, EncryptionPurpose.TAX_RETURN_STORE, null);
+            assertThatThrownBy(() -> subject.decrypt(ciphertext, EncryptionPurpose.TAX_RETURN_FACTS))
+                    .isInstanceOf(EncryptionContextMismatchException.class);
+
+            assertThat(appender.list)
+                    .anyMatch(event -> event.getLevel() == ch.qos.logback.classic.Level.ERROR
+                            && event.getFormattedMessage().contains(EncryptionContextMismatchException.MARKER)
+                            && event.getFormattedMessage().contains("tax-return-facts")
+                            && event.getFormattedMessage().contains("tax-return-store"));
+        } finally {
+            logger.detachAppender(appender);
+        }
+    }
 }
