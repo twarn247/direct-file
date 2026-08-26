@@ -34,6 +34,7 @@ import gov.irs.directfile.models.encryption.DataEncryptDecrypt;
 
 @AutoConfiguration
 @Slf4j
+@EnableConfigurationProperties(EncryptionContextProperties.class)
 @Import(DataEncryptDecrypt.class)
 public class EncryptionAutoConfiguration {
 
