@@ -68,7 +68,11 @@ public class TaxReturnEntityListenerTest {
 
     private TaxReturn taxReturnWithContent() {
         TaxReturn taxReturn = new TaxReturn();
-        taxReturn.setFacts(Map.<String, FactTypeWithItem>of());
+        taxReturn.setFacts(Map.of(
+                "/foo",
+                new FactTypeWithItem(
+                        "gov.irs.factgraph.persisters.StringWrapper",
+                        com.fasterxml.jackson.databind.node.TextNode.valueOf("baz"))));
         taxReturn.setStore("{}");
         return taxReturn;
     }
@@ -87,9 +91,9 @@ public class TaxReturnEntityListenerTest {
         listener.encryptColumns(taxReturn);
 
         ArgumentCaptor<EncryptionPurpose> purposes = ArgumentCaptor.captor();
-        verify(ded, org.mockito.Mockito.atLeast(2)).encrypt(any(), purposes.capture(), any());
+        verify(ded, org.mockito.Mockito.times(2)).encrypt(any(), purposes.capture(), any());
         assertThat(purposes.getAllValues())
-                .contains(EncryptionPurpose.TAX_RETURN_FACTS, EncryptionPurpose.TAX_RETURN_STORE);
+                .containsExactly(EncryptionPurpose.TAX_RETURN_FACTS, EncryptionPurpose.TAX_RETURN_STORE);
     }
 
     @Test
@@ -103,8 +107,8 @@ public class TaxReturnEntityListenerTest {
         listener.encryptColumns(taxReturnWithContent());
 
         ArgumentCaptor<String> actorId = ArgumentCaptor.captor();
-        verify(ded, org.mockito.Mockito.atLeastOnce()).encrypt(any(), any(EncryptionPurpose.class), actorId.capture());
-        assertThat(actorId.getValue()).isEqualTo(externalId.toString());
+        verify(ded, org.mockito.Mockito.times(2)).encrypt(any(), any(EncryptionPurpose.class), actorId.capture());
+        assertThat(actorId.getAllValues()).containsExactly(externalId.toString(), externalId.toString());
     }
 
     @Test
@@ -114,8 +118,8 @@ public class TaxReturnEntityListenerTest {
         listener.encryptColumns(taxReturnWithContent());
 
         ArgumentCaptor<String> actorId = ArgumentCaptor.captor();
-        verify(ded, org.mockito.Mockito.atLeastOnce()).encrypt(any(), any(EncryptionPurpose.class), actorId.capture());
-        assertThat(actorId.getValue()).isNull();
+        verify(ded, org.mockito.Mockito.times(2)).encrypt(any(), any(EncryptionPurpose.class), actorId.capture());
+        assertThat(actorId.getAllValues()).containsExactly(null, null);
     }
 
     @Test
@@ -128,8 +132,8 @@ public class TaxReturnEntityListenerTest {
         listener.decryptColumns(taxReturn);
 
         ArgumentCaptor<EncryptionPurpose> purposes = ArgumentCaptor.captor();
-        verify(ded, org.mockito.Mockito.atLeast(2)).decrypt(any(), purposes.capture());
+        verify(ded, org.mockito.Mockito.times(2)).decrypt(any(), purposes.capture());
         assertThat(purposes.getAllValues())
-                .contains(EncryptionPurpose.TAX_RETURN_FACTS, EncryptionPurpose.TAX_RETURN_STORE);
+                .containsExactly(EncryptionPurpose.TAX_RETURN_FACTS, EncryptionPurpose.TAX_RETURN_STORE);
     }
 }
