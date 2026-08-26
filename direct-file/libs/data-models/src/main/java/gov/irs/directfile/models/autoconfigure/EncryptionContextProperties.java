@@ -1,5 +1,6 @@
 package gov.irs.directfile.models.autoconfigure;
 
+import jakarta.annotation.PostConstruct;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -20,5 +21,13 @@ public class EncryptionContextProperties {
 
     public boolean isEnforcing() {
         return ENFORCE.equalsIgnoreCase(contextVerification);
+    }
+
+    @PostConstruct
+    void validate() {
+        if (!WARN.equalsIgnoreCase(contextVerification) && !ENFORCE.equalsIgnoreCase(contextVerification)) {
+            throw new IllegalStateException("direct-file.encryption.context-verification must be '" + WARN + "' or '"
+                    + ENFORCE + "', got: " + contextVerification);
+        }
     }
 }
