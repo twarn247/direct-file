@@ -164,7 +164,7 @@ Two consequences to carry into the Phase B plan:
 
 Items the implementation cannot perform:
 
-1. **Confirm the KMS key policy does not constrain `kms:EncryptionContext:type`** or any other key whose shape this change alters. If it does, the policy must be updated before Phase A deploys, or Encrypt calls will begin failing.
+1. **Confirm the KMS key policy does not constrain `kms:EncryptionContext:type`, `kms:EncryptionContext:system`, or `kms:EncryptionContext:purpose`.** This change drops `type` entirely, normalizes `system` to a single spelling present on every write (previously only system-triggered tax-return writes carried `system`; authenticated writes carried `{id}` alone), and adds `purpose` to every write. If the policy constrains any of these three keys, it must be updated before Phase A deploys, or Encrypt calls will begin failing.
 2. **Confirm `generateAuthorizationToken` is genuinely unreachable in deployed environments** (§2.4). If some deployed configuration routes to it, the state-api ciphertext population is not empty and Phase B grows a third table.
 3. **Decide the Phase C observation window** (§3.4) — bounded by how long a tax return can sit unread and still be loaded.
 4. **Approve the loss of `id` attribution on backfilled rows** (§4).
