@@ -22,8 +22,8 @@ import gov.irs.directfile.models.encryption.EncryptionContextMismatchException;
 import gov.irs.directfile.models.encryption.EncryptionPurpose;
 import gov.irs.directfile.stateapi.model.AuthCodeRequest;
 
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest
