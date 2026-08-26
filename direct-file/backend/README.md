@@ -363,3 +363,36 @@ initdb: error: directory "/var/lib/postgresql/data" exists but is not empty.....
 2. `rm -rf data`
 3. Navigate back to `direct-file/direct-file/backend`
 4. try `docker compose up -d`
+
+### Encryption context verification
+
+Every ciphertext this service writes binds a `purpose` into its AWS Encryption SDK
+encryption context, and every decrypt asserts the purpose it expected. A blob carrying
+the *wrong* purpose is always rejected.
+
+`direct-file.encryption.context-verification` governs only ciphertext written before
+purposes existed:
+
+| Value | Untagged ciphertext |
+|---|---|
+| `warn` (default) | accepted, logged under the marker `ENCRYPTION_CONTEXT_LEGACY` |
+| `enforce` | rejected |
+
+Leave it at `warn` until the legacy population has been re-encrypted. Flipping to
+`enforce` while untagged rows remain makes those rows unreadable. The gate for flipping
+is a log query for `ENCRYPTION_CONTEXT_LEGACY` returning zero across an observation
+window longer than the longest interval at which a dormant tax return can be loaded.
+
+`ENCRYPTION_CONTEXT_LEGACY` means exactly one thing: *ciphertext still waiting to be
+migrated*. The data-import read paths are untagged permanently — their writer is outside
+this repository — so they are read through `decryptLegacyTolerant`, which accepts without
+reporting. If they reported, the gate above could never reach zero.
+
+Two markers, and they mean opposite things:
+
+| Marker | Meaning |
+|---|---|
+| `ENCRYPTION_CONTEXT_LEGACY` | expected during Phase A; the count that must reach zero |
+| `ENCRYPTION_CONTEXT_MISMATCH` | never expected; a blob carried the wrong purpose and was refused |
+
+See `docs/security/2026-08-25_h1-encryption-context-spec.md`.

@@ -39,20 +39,6 @@ public class DataEncryptDecrypt {
         this.encryptionContextProperties = encryptionContextProperties;
     }
 
-    /** @deprecated use {@link #encrypt(byte[], EncryptionPurpose, String)}; removed in Task 6. */
-    @Deprecated
-    public byte[] encrypt(byte[] bytes, Map<String, String> context) {
-        CryptoResult<byte[], ?> encryptResult = awsCrypto.encryptData(cryptoMaterialsManager, bytes, context);
-        return encryptResult.getResult();
-    }
-
-    /** @deprecated use {@link #decrypt(byte[], EncryptionPurpose)}; removed in Task 6. */
-    @Deprecated
-    public byte[] decrypt(byte[] ciphertext) {
-        CryptoResult<byte[], ?> decryptResult = awsCrypto.decryptData(cryptoMaterialsManager, ciphertext);
-        return decryptResult.getResult();
-    }
-
     public byte[] encrypt(byte[] bytes, EncryptionPurpose purpose, String actorId) {
         CryptoResult<byte[], ?> encryptResult =
                 awsCrypto.encryptData(cryptoMaterialsManager, bytes, EncryptionContexts.forPurpose(purpose, actorId));
