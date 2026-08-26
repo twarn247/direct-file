@@ -332,4 +332,11 @@ Ordered by dependency and lead time, not severity. The long poles are IN-6 (exte
 ### Tranche 3 — longest code lead time, does not gate Indiana
 - **H-1** — encryption context normalization and dual-read migration. Should be underway rather than complete at go-live. Every state added raises the cost of continuing to defer it.
 
+> **Status as of 2026-08-25.** Tranches 0 and 1 are closed in code. H-1 is specified in
+> `docs/security/2026-08-25_h1-encryption-context-spec.md`, with Phase A (normalize writes,
+> verify reads, ship in `warn`) planned in
+> `docs/superpowers/plans/2026-08-25-h1-encryption-context-tranche-3.md`. Phase B (backfill)
+> and Phase C (enforce) are scoped there but not yet planned. Tranche 2 remains open and is
+> not code work — it needs the counterparty.
+
 **Critical path:** IN-6 → IN-1 → M-3 → IN-4. Everything else parallelizes around it.
