@@ -37,7 +37,7 @@ public class RawResponseDecryptor {
             // fall into the generic catch-all below and get logged as an ordinary parse failure.
         } catch (Exception e) {
             log.error(
-                    "Failed to decrypt / parse data column in populated_data. Exception: {}. Error: {}",
+                    "Failed to decrypt / parse raw_data column in populated_data. Exception: {}. Error: {}",
                     e.getClass().getName(),
                     e.getMessage());
         }
