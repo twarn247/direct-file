@@ -27,4 +27,29 @@ public class GenericStringEncryptor {
         byte[] decrypted = dataEncryptDecrypt.decrypt(ciphertext);
         return new String(decrypted);
     }
+
+    public String convertToDatabaseColumn(String attribute, EncryptionPurpose purpose, String actorId) {
+        if (attribute == null || attribute.isEmpty()) {
+            return attribute;
+        }
+        byte[] ciphertext = dataEncryptDecrypt.encrypt(attribute.getBytes(), purpose, actorId);
+        return Base64.getEncoder().encodeToString(ciphertext);
+    }
+
+    public String convertToEntityAttribute(String dbData, EncryptionPurpose expected) {
+        if (dbData == null || dbData.isEmpty()) {
+            return dbData;
+        }
+        byte[] ciphertext = Base64.getDecoder().decode(dbData);
+        return new String(dataEncryptDecrypt.decrypt(ciphertext, expected));
+    }
+
+    /** See {@link DataEncryptDecrypt#decryptLegacyTolerant} — data-import populations only. */
+    public String convertToEntityAttributeLegacyTolerant(String dbData, EncryptionPurpose expected) {
+        if (dbData == null || dbData.isEmpty()) {
+            return dbData;
+        }
+        byte[] ciphertext = Base64.getDecoder().decode(dbData);
+        return new String(dataEncryptDecrypt.decryptLegacyTolerant(ciphertext, expected));
+    }
 }
