@@ -396,3 +396,36 @@ Two markers, and they mean opposite things:
 | `ENCRYPTION_CONTEXT_MISMATCH` | never expected; a blob carried the wrong purpose and was refused |
 
 See `docs/security/2026-08-25_h1-encryption-context-spec.md`.
+
+#### H-1 Phase B — ciphertext backfill
+
+Re-encrypts existing `taxreturns` and `taxreturn_submissions` rows so their ciphertext
+carries a bound encryption purpose. Off by default.
+
+| Property | Default | Meaning |
+|---|---|---|
+| `direct-file.encryption.backfill.enabled` | `false` | Master switch |
+| `direct-file.encryption.backfill.batch-size` | `100` | Rows per tick |
+| `direct-file.encryption.backfill.fixed-delay-millis` | `5000` | Delay between ticks |
+
+**Prerequisites.** `direct-file.encryption.context-verification` must be `warn` — the
+application refuses to start with the backfill enabled under `enforce`, because untagged
+ciphertext cannot be read in that mode. The two owner approvals in
+`docs/security/2026-08-25_h1-encryption-context-spec.md` §6 (items 4 and 5) must be
+recorded before enabling against real data.
+
+**Running it.** Set `enabled: true` and watch `ENCRYPTION_BACKFILL_PROGRESS`. The sweep
+does tax returns first, then submissions, and stops on its own when both are complete.
+It is safe to disable at any point; it resumes from its persisted cursor.
+
+**Watch for `ENCRYPTION_BACKFILL_ROW_FAILED`.** Rows that could not be decrypted are
+skipped, not retried — the sweep advances past them deliberately so one bad row cannot
+stall it. Any occurrence needs investigating before Phase C, because those rows will
+still be untagged when the gate is measured.
+
+**Restarting a completed sweep.** Delete the relevant row from
+`encryption_backfill_progress`. There is no admin endpoint by design.
+
+**This does not close H-1.** Phase C — flipping `context-verification` to `enforce` —
+is gated on the `ENCRYPTION_CONTEXT_LEGACY` marker reading zero across an observation
+window that has not yet been decided.

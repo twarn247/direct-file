@@ -1,0 +1,86 @@
+package gov.irs.directfile.api.taxreturn;
+
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import gov.irs.directfile.api.taxreturn.models.EncryptionBackfillProgress;
+import gov.irs.directfile.models.autoconfigure.EncryptionContextProperties;
+
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+class EncryptionBackfillWorkerTest {
+
+    @Mock
+    private EncryptionBackfillService service;
+
+    private EncryptionContextProperties warnMode() {
+        EncryptionContextProperties properties = new EncryptionContextProperties();
+        properties.setContextVerification(EncryptionContextProperties.WARN);
+        return properties;
+    }
+
+    private EncryptionContextProperties enforceMode() {
+        EncryptionContextProperties properties = new EncryptionContextProperties();
+        properties.setContextVerification(EncryptionContextProperties.ENFORCE);
+        return properties;
+    }
+
+    @Test
+    void refusesToStartUnderEnforceMode() {
+        EncryptionBackfillWorker worker = new EncryptionBackfillWorker(service, enforceMode(), true, 100);
+
+        assertThatThrownBy(worker::verifyRunnable)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("warn");
+    }
+
+    @Test
+    void startsUnderWarnMode() {
+        EncryptionBackfillWorker worker = new EncryptionBackfillWorker(service, warnMode(), true, 100);
+
+        worker.verifyRunnable();
+    }
+
+    @Test
+    void doesNothingWhenDisabled() {
+        EncryptionBackfillWorker worker = new EncryptionBackfillWorker(service, warnMode(), false, 100);
+
+        worker.tick();
+
+        verify(service, never()).processNextBatch(any(), anyInt());
+    }
+
+    @Test
+    void sweepsTaxReturnsBeforeSubmissions() {
+        when(service.processNextBatch(eq(EncryptionBackfillProgress.TAX_RETURNS), anyInt()))
+                .thenReturn(new EncryptionBackfillService.BatchResult(10, 10, false));
+        EncryptionBackfillWorker worker = new EncryptionBackfillWorker(service, warnMode(), true, 100);
+
+        worker.tick();
+
+        verify(service).processNextBatch(EncryptionBackfillProgress.TAX_RETURNS, 100);
+        verify(service, never()).processNextBatch(eq(EncryptionBackfillProgress.TAX_RETURN_SUBMISSIONS), anyInt());
+    }
+
+    @Test
+    void movesToSubmissionsOnceTaxReturnsAreComplete() {
+        when(service.processNextBatch(eq(EncryptionBackfillProgress.TAX_RETURNS), anyInt()))
+                .thenReturn(new EncryptionBackfillService.BatchResult(0, 0, true));
+        when(service.processNextBatch(eq(EncryptionBackfillProgress.TAX_RETURN_SUBMISSIONS), anyInt()))
+                .thenReturn(new EncryptionBackfillService.BatchResult(5, 5, false));
+        EncryptionBackfillWorker worker = new EncryptionBackfillWorker(service, warnMode(), true, 100);
+
+        worker.tick();
+
+        verify(service).processNextBatch(EncryptionBackfillProgress.TAX_RETURN_SUBMISSIONS, 100);
+    }
+}
