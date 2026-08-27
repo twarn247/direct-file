@@ -16,6 +16,12 @@ public interface TaxReturnEntity {
 
     void setFactsWithoutDirtyingEntity(Map<String, FactTypeWithItem> facts);
 
+    /**
+     * Sets the decrypted facts and marks the entity dirty, so a subsequent flush triggers
+     * @PreUpdate and re-encrypts. This is the hook the H-1 Phase B backfill drives.
+     */
+    void setFacts(Map<String, FactTypeWithItem> facts);
+
     // Field "store" is part of TaxReturn, not TaxReturnSubmission
     default void setStoreCipherText(String store) {}
 
