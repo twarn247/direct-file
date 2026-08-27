@@ -11,6 +11,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import gov.irs.directfile.api.taxreturn.models.TaxReturn;
+import gov.irs.directfile.api.taxreturn.models.TaxReturnSubmission;
 import gov.irs.directfile.models.encryption.EncryptionContextMismatchException;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -89,5 +90,61 @@ class EncryptionBackfillRowServiceTest {
 
         assertThat(result).isFalse();
         verify(taxReturnRepository, never()).save(any());
+    }
+
+    // reencryptSubmission mirrors reencryptTaxReturn through the same generic private
+    // helper; these confirm that path also for the submission side, which shares no
+    // code with the tax-return side except that helper.
+
+    @Test
+    void reencryptSubmission_dirtiesAndSavesTheRow() {
+        UUID id = UUID.randomUUID();
+        TaxReturnSubmission submission = new TaxReturnSubmission();
+        submission.setFactsWithoutDirtyingEntity(java.util.Map.of());
+        when(taxReturnSubmissionRepository.findById(id)).thenReturn(Optional.of(submission));
+
+        boolean result = service.reencryptSubmission(id);
+
+        assertThat(result).isTrue();
+        verify(taxReturnSubmissionRepository).save(submission);
+        verify(entityManager).flush();
+    }
+
+    @Test
+    void reencryptSubmission_returnsFalseWhenFlushFailsAtWriteTime() {
+        UUID id = UUID.randomUUID();
+        TaxReturnSubmission submission = new TaxReturnSubmission();
+        submission.setFactsWithoutDirtyingEntity(java.util.Map.of());
+        when(taxReturnSubmissionRepository.findById(id)).thenReturn(Optional.of(submission));
+        doThrow(new EncryptionContextMismatchException("purpose mismatch"))
+                .when(entityManager)
+                .flush();
+
+        boolean result = service.reencryptSubmission(id);
+
+        assertThat(result).isFalse();
+    }
+
+    @Test
+    void reencryptSubmission_returnsFalseWhenTheRowIsGone() {
+        UUID id = UUID.randomUUID();
+        when(taxReturnSubmissionRepository.findById(id)).thenReturn(Optional.empty());
+
+        boolean result = service.reencryptSubmission(id);
+
+        assertThat(result).isFalse();
+        verify(taxReturnSubmissionRepository, never()).save(any());
+    }
+
+    @Test
+    void reencryptSubmission_returnsFalseWhenTheRowCannotBeDecrypted() {
+        UUID id = UUID.randomUUID();
+        when(taxReturnSubmissionRepository.findById(id))
+                .thenThrow(new EncryptionContextMismatchException("purpose mismatch"));
+
+        boolean result = service.reencryptSubmission(id);
+
+        assertThat(result).isFalse();
+        verify(taxReturnSubmissionRepository, never()).save(any());
     }
 }

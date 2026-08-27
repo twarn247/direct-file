@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 
 import gov.irs.directfile.api.taxreturn.models.EncryptionBackfillProgress;
 import gov.irs.directfile.api.util.base.BaseRepositoryTest;
@@ -19,6 +20,9 @@ class EncryptionBackfillProgressRepositoryTest extends BaseRepositoryTest {
     @Autowired
     private EncryptionBackfillProgressRepository repository;
 
+    @Autowired
+    private TestEntityManager entityManager;
+
     @Test
     void persistsAndReadsBackACursor() {
         UUID cursor = UUID.randomUUID();
@@ -28,6 +32,11 @@ class EncryptionBackfillProgressRepositoryTest extends BaseRepositoryTest {
         progress.setCompleted(false);
 
         repository.save(progress);
+        // Force a real round trip to the database (flush the pending INSERT, then clear
+        // the persistence context) so findById below actually validates the migration's
+        // column mapping instead of being served from the first-level cache.
+        entityManager.flush();
+        entityManager.clear();
 
         Optional<EncryptionBackfillProgress> found = repository.findById(EncryptionBackfillProgress.TAX_RETURNS);
         assertThat(found).isPresent();
@@ -50,6 +59,8 @@ class EncryptionBackfillProgressRepositoryTest extends BaseRepositoryTest {
         submissions.setCompleted(true);
 
         repository.saveAll(java.util.List.of(returns, submissions));
+        entityManager.flush();
+        entityManager.clear();
 
         assertThat(repository
                         .findById(EncryptionBackfillProgress.TAX_RETURNS)
