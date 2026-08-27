@@ -15,6 +15,7 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Bean;
+import org.springframework.data.domain.Limit;
 
 import gov.irs.directfile.api.config.identity.IdentityAttributes;
 import gov.irs.directfile.api.config.identity.IdentitySupplier;
@@ -231,5 +232,47 @@ class TaxReturnRepositoryTest extends BaseRepositoryTest {
         trIDs.forEach(trID -> {
             assertTrue(result.contains(taxReturnRepo.findById(trID).get()));
         });
+    }
+
+    @Test
+    void findIdsForBackfillAfter_returnsAscendingIdsStrictlyGreaterThanCursor() {
+        // Persist three tax returns, then page from the lowest id.
+        User user = new User(UUID.fromString("738fc2dc-88f9-4b5c-ace9-c602509ba162"));
+        user = entityManager.persist(user);
+
+        TaxReturn taxReturn0 = TaxReturn.testObjectFactoryNoId();
+        user.addTaxReturn(taxReturn0);
+        taxReturn0 = entityManager.persist(taxReturn0);
+
+        TaxReturn taxReturn1 = TaxReturn.testObjectFactoryNoId();
+        user.addTaxReturn(taxReturn1);
+        taxReturn1 = entityManager.persist(taxReturn1);
+
+        List<UUID> allIds = taxReturnRepo.findIdsForBackfillAfter(new UUID(0L, 0L), Limit.of(100));
+
+        assertThat(allIds).hasSizeGreaterThanOrEqualTo(1);
+
+        UUID first = allIds.get(0);
+        List<UUID> afterFirst = taxReturnRepo.findIdsForBackfillAfter(first, Limit.of(100));
+
+        assertThat(afterFirst).doesNotContain(first);
+    }
+
+    @Test
+    void findIdsForBackfillAfter_respectsTheLimit() {
+        User user = new User(UUID.fromString("738fc2dc-88f9-4b5c-ace9-c602509ba163"));
+        user = entityManager.persist(user);
+
+        TaxReturn taxReturn0 = TaxReturn.testObjectFactoryNoId();
+        user.addTaxReturn(taxReturn0);
+        taxReturn0 = entityManager.persist(taxReturn0);
+
+        TaxReturn taxReturn1 = TaxReturn.testObjectFactoryNoId();
+        user.addTaxReturn(taxReturn1);
+        taxReturn1 = entityManager.persist(taxReturn1);
+
+        List<UUID> page = taxReturnRepo.findIdsForBackfillAfter(new UUID(0L, 0L), Limit.of(1));
+
+        assertThat(page).hasSizeLessThanOrEqualTo(1);
     }
 }

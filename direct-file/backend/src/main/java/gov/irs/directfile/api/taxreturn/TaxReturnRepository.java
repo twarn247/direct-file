@@ -11,6 +11,7 @@ import org.springframework.data.domain.ScrollPosition;
 import org.springframework.data.domain.Window;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.CrudRepository;
+import org.springframework.data.repository.query.Param;
 
 import gov.irs.directfile.api.taxreturn.models.TaxReturn;
 
@@ -38,4 +39,15 @@ public interface TaxReturnRepository extends CrudRepository<TaxReturn, UUID> {
     // https://docs.spring.io/spring-data/jpa/docs/current-SNAPSHOT/reference/html/#jpa.query-methods.query-creation
     Window<SimpleTaxReturnProjection> findByTaxYearAndSubmitTimeIsNullAndCreatedAtBetweenOrderByCreatedAtAsc(
             Limit limit, int taxYear, Date createdStart, Date createdEnd, KeysetScrollPosition position);
+
+    /**
+     * Primary keys for the H-1 Phase B backfill, ascending, strictly greater than
+     * {@code afterId}. Pass the all-zero UUID to start from the beginning.
+     *
+     * <p>Returns ids rather than entities on purpose: loading entities fires @PostLoad,
+     * which decrypts every row in the page, so one undecryptable row would fail the whole
+     * page and stall the sweep permanently. The backfill loads each row individually.
+     */
+    @Query("SELECT t.id FROM TaxReturn t WHERE t.id > :afterId ORDER BY t.id ASC")
+    List<UUID> findIdsForBackfillAfter(@Param("afterId") UUID afterId, Limit limit);
 }
