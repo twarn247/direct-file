@@ -84,6 +84,7 @@ class EncryptionBackfillWorkerTest {
     @Test
     void releasesTheLockAfterATick() {
         when(advisoryLockRepository.acquireLock(anyInt())).thenReturn(true);
+        when(advisoryLockRepository.releaseLock(anyInt())).thenReturn(true);
         when(service.processNextBatch(eq(EncryptionBackfillProgress.TAX_RETURNS), anyInt()))
                 .thenReturn(new EncryptionBackfillService.BatchResult(0, 0, true));
         when(service.processNextBatch(eq(EncryptionBackfillProgress.TAX_RETURN_SUBMISSIONS), anyInt()))
@@ -99,6 +100,7 @@ class EncryptionBackfillWorkerTest {
     @Test
     void releasesTheLockEvenWhenABatchThrows() {
         when(advisoryLockRepository.acquireLock(anyInt())).thenReturn(true);
+        when(advisoryLockRepository.releaseLock(anyInt())).thenReturn(true);
         when(service.processNextBatch(eq(EncryptionBackfillProgress.TAX_RETURNS), anyInt()))
                 .thenThrow(new RuntimeException("boom"));
         EncryptionBackfillWorker worker =
@@ -110,8 +112,29 @@ class EncryptionBackfillWorkerTest {
     }
 
     @Test
+    void doesNotThrowWhenReleaseFailsOnADifferentConnection() {
+        // Defense in depth: even if tick() ever stopped pinning one connection and unlock
+        // landed on the wrong session, a failed release must not fail the tick -- it's
+        // logged (ENCRYPTION_BACKFILL_ROW_FAILED-style visibility for an operator, not a
+        // thrown exception) so the sweep's own work already committed is not undone by it.
+        when(advisoryLockRepository.acquireLock(anyInt())).thenReturn(true);
+        when(advisoryLockRepository.releaseLock(anyInt())).thenReturn(false);
+        when(service.processNextBatch(eq(EncryptionBackfillProgress.TAX_RETURNS), anyInt()))
+                .thenReturn(new EncryptionBackfillService.BatchResult(0, 0, true));
+        when(service.processNextBatch(eq(EncryptionBackfillProgress.TAX_RETURN_SUBMISSIONS), anyInt()))
+                .thenReturn(new EncryptionBackfillService.BatchResult(0, 0, true));
+        EncryptionBackfillWorker worker =
+                new EncryptionBackfillWorker(service, warnMode(), advisoryLockRepository, true, 100);
+
+        worker.tick();
+
+        verify(advisoryLockRepository).releaseLock(anyInt());
+    }
+
+    @Test
     void sweepsTaxReturnsBeforeSubmissions() {
         when(advisoryLockRepository.acquireLock(anyInt())).thenReturn(true);
+        when(advisoryLockRepository.releaseLock(anyInt())).thenReturn(true);
         when(service.processNextBatch(eq(EncryptionBackfillProgress.TAX_RETURNS), anyInt()))
                 .thenReturn(new EncryptionBackfillService.BatchResult(10, 10, false));
         EncryptionBackfillWorker worker =
@@ -126,6 +149,7 @@ class EncryptionBackfillWorkerTest {
     @Test
     void movesToSubmissionsOnceTaxReturnsAreComplete() {
         when(advisoryLockRepository.acquireLock(anyInt())).thenReturn(true);
+        when(advisoryLockRepository.releaseLock(anyInt())).thenReturn(true);
         when(service.processNextBatch(eq(EncryptionBackfillProgress.TAX_RETURNS), anyInt()))
                 .thenReturn(new EncryptionBackfillService.BatchResult(0, 0, true));
         when(service.processNextBatch(eq(EncryptionBackfillProgress.TAX_RETURN_SUBMISSIONS), anyInt()))

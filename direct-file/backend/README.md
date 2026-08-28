@@ -417,10 +417,19 @@ recorded before enabling against real data.
 **Running it.** Set `enabled: true` and watch `ENCRYPTION_BACKFILL_PROGRESS`. The sweep
 does tax returns first, then submissions, and stops on its own when both are complete.
 It is safe to disable at any point; it resumes from its persisted cursor. It is also
-safe to enable on every replica at once: each tick takes a Postgres advisory lock
-(the same `pg_try_advisory_lock` mechanism `TaxReturnService` uses for per-return
-submission locking) before doing any work, so only one instance sweeps at a time —
-a replica that loses the race simply skips that tick and tries again on its next one.
+safe to enable on every replica at once: `tick()` is `@Transactional` and takes a
+Postgres advisory lock as its first statement (the same `pg_try_advisory_lock`
+mechanism `TaxReturnService` uses for per-return submission locking) before doing any
+work, so only one instance sweeps at a time — a replica that loses the race simply
+skips that tick and tries again on its next one. The `@Transactional` is load-bearing,
+not incidental: `pg_advisory_unlock` only succeeds on the same physical connection
+that took the lock, and the transaction is what pins the tick to one pooled
+connection across acquire, work, and release. Before enabling against a
+multi-replica deployment for the first time, prove this against a real Postgres with
+two instances (or two threads) running concurrently, watching `pg_locks` — a unit
+test with a mocked lock repository cannot observe connection identity and so cannot
+catch a regression here; watch for `Encryption backfill advisory lock ... failed to
+release` in the logs, which would indicate exactly that regression.
 
 **Watch for `ENCRYPTION_BACKFILL_ROW_FAILED`.** Rows that could not be decrypted are
 skipped, not retried — the sweep advances past them deliberately so one bad row cannot

@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import gov.irs.directfile.api.taxreturn.models.EncryptionBackfillProgress;
 import gov.irs.directfile.api.taxreturn.submissions.lock.AdvisoryLockRepository;
@@ -24,6 +25,16 @@ import gov.irs.directfile.models.autoconfigure.EncryptionContextProperties;
  * turning transient contention into a permanent, silent skip. Same {@code
  * pg_try_advisory_lock} mechanism {@code TaxReturnService} already uses for per-return
  * submission locking.
+ *
+ * <p><b>{@code tick()} must stay {@code @Transactional}.</b> {@code pg_try_advisory_lock}
+ * and {@code pg_advisory_unlock} are session-scoped in Postgres: unlock only succeeds on
+ * the same physical connection that took the lock. Without one transaction pinning a single
+ * pooled connection across acquire, work, and release, the lock and unlock calls -- each an
+ * independent Spring Data JPA call otherwise -- can land on different connections borrowed
+ * from the pool, in which case {@code pg_advisory_unlock} silently returns {@code false} and
+ * the lock leaks onto that connection until the pool evicts it. Per-row work still runs in
+ * its own {@code REQUIRES_NEW} transaction and its own connection, suspended out of this
+ * one, so this does not change per-row isolation -- it only pins the lock's own connection.
  */
 @Component
 @Slf4j
@@ -75,6 +86,7 @@ public class EncryptionBackfillWorker {
     }
 
     @Scheduled(fixedDelayString = "${direct-file.encryption.backfill.fixed-delay-millis:5000}", initialDelay = 30000)
+    @Transactional
     public void tick() {
         if (!enabled) {
             return;
@@ -102,7 +114,12 @@ public class EncryptionBackfillWorker {
                 logProgress(EncryptionBackfillProgress.TAX_RETURN_SUBMISSIONS, submissions);
             }
         } finally {
-            advisoryLockRepository.releaseLock(LOCK_ID);
+            if (!advisoryLockRepository.releaseLock(LOCK_ID)) {
+                log.warn(
+                        "Encryption backfill advisory lock (id={}) failed to release -- it will remain held "
+                                + "on this connection until the connection pool evicts it",
+                        LOCK_ID);
+            }
         }
     }
 
