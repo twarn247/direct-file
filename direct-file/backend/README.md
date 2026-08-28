@@ -416,12 +416,22 @@ recorded before enabling against real data.
 
 **Running it.** Set `enabled: true` and watch `ENCRYPTION_BACKFILL_PROGRESS`. The sweep
 does tax returns first, then submissions, and stops on its own when both are complete.
-It is safe to disable at any point; it resumes from its persisted cursor.
+It is safe to disable at any point; it resumes from its persisted cursor. It is also
+safe to enable on every replica at once: each tick takes a Postgres advisory lock
+(the same `pg_try_advisory_lock` mechanism `TaxReturnService` uses for per-return
+submission locking) before doing any work, so only one instance sweeps at a time —
+a replica that loses the race simply skips that tick and tries again on its next one.
 
 **Watch for `ENCRYPTION_BACKFILL_ROW_FAILED`.** Rows that could not be decrypted are
 skipped, not retried — the sweep advances past them deliberately so one bad row cannot
 stall it. Any occurrence needs investigating before Phase C, because those rows will
 still be untagged when the gate is measured.
+
+**A row with a `NULL` facts column is rewritten to `''`.** `FactsEncryptor` treats
+`NULL` and an empty ciphertext string identically on read (both decode to an empty
+map), so this is functionally harmless — but it is a real `NULL`→`''` change at the
+column level, on top of the `updated_at` bump every touched row gets. Relevant to
+owner approval item 5 below, which is already about that column.
 
 **Restarting a completed sweep.** Delete the relevant row from
 `encryption_backfill_progress`. There is no admin endpoint by design.
