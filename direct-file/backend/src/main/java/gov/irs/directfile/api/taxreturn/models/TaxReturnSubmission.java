@@ -64,6 +64,7 @@ public class TaxReturnSubmission implements TaxReturnEntity {
     @Transient
     private Map<String, FactTypeWithItem> facts;
 
+    @Override
     public void setFacts(Map<String, FactTypeWithItem> facts) {
         this.setFactsCipherText(DD);
         this.facts = facts;

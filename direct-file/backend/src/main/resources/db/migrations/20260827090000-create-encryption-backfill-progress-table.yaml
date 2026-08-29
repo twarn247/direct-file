@@ -1,0 +1,36 @@
+databaseChangeLog:
+  - changeSet:
+      id: create-encryption-backfill-progress-table
+      author: directfile
+      changes:
+        - createTable:
+            tableName: encryption_backfill_progress
+            columns:
+              - column:
+                  name: target_table
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+                    primaryKey: true
+                    primaryKeyName: encryption_backfill_progress_pkey
+              # Highest primary key already re-encrypted. Null means "not started".
+              - column:
+                  name: last_id
+                  type: uuid
+                  constraints:
+                    nullable: true
+              - column:
+                  name: completed
+                  type: boolean
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamp
+                  defaultValueComputed: 'CURRENT_TIMESTAMP'
+                  constraints:
+                    nullable: false
+      rollback:
+        - dropTable:
+            tableName: encryption_backfill_progress

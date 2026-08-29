@@ -4,8 +4,10 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.data.domain.Limit;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.CrudRepository;
+import org.springframework.data.repository.query.Param;
 
 import gov.irs.directfile.api.taxreturn.models.TaxReturnSubmission;
 
@@ -85,4 +87,12 @@ public interface TaxReturnSubmissionRepository extends CrudRepository<TaxReturnS
             + "ORDER BY s.createdAt DESC "
             + "LIMIT 1")
     Optional<Boolean> isTaxReturnEditable(UUID taxReturnId);
+
+    /**
+     * Primary keys for the H-1 Phase B backfill, ascending, strictly greater than
+     * {@code afterId}. See TaxReturnRepository.findIdsForBackfillAfter for why this
+     * returns ids rather than entities.
+     */
+    @Query("SELECT s.id FROM TaxReturnSubmission s WHERE s.id > :afterId ORDER BY s.id ASC")
+    List<UUID> findIdsForBackfillAfter(@Param("afterId") UUID afterId, Limit limit);
 }

@@ -396,3 +396,55 @@ Two markers, and they mean opposite things:
 | `ENCRYPTION_CONTEXT_MISMATCH` | never expected; a blob carried the wrong purpose and was refused |
 
 See `docs/security/2026-08-25_h1-encryption-context-spec.md`.
+
+#### H-1 Phase B — ciphertext backfill
+
+Re-encrypts existing `taxreturns` and `taxreturn_submissions` rows so their ciphertext
+carries a bound encryption purpose. Off by default.
+
+| Property | Default | Meaning |
+|---|---|---|
+| `direct-file.encryption.backfill.enabled` | `false` | Master switch |
+| `direct-file.encryption.backfill.batch-size` | `100` | Rows per tick |
+| `direct-file.encryption.backfill.fixed-delay-millis` | `5000` | Delay between ticks |
+
+**Prerequisites.** `direct-file.encryption.context-verification` must be `warn` — the
+application refuses to start with the backfill enabled under `enforce`, because untagged
+ciphertext cannot be read in that mode. The two owner approvals in
+`docs/security/2026-08-25_h1-encryption-context-spec.md` §6 (items 4 and 5) must be
+recorded before enabling against real data.
+
+**Running it.** Set `enabled: true` and watch `ENCRYPTION_BACKFILL_PROGRESS`. The sweep
+does tax returns first, then submissions, and stops on its own when both are complete.
+It is safe to disable at any point; it resumes from its persisted cursor. It is also
+safe to enable on every replica at once: `tick()` is `@Transactional` and takes a
+Postgres advisory lock as its first statement (the same `pg_try_advisory_lock`
+mechanism `TaxReturnService` uses for per-return submission locking) before doing any
+work, so only one instance sweeps at a time — a replica that loses the race simply
+skips that tick and tries again on its next one. The `@Transactional` is load-bearing,
+not incidental: `pg_advisory_unlock` only succeeds on the same physical connection
+that took the lock, and the transaction is what pins the tick to one pooled
+connection across acquire, work, and release. Before enabling against a
+multi-replica deployment for the first time, prove this against a real Postgres with
+two instances (or two threads) running concurrently, watching `pg_locks` — a unit
+test with a mocked lock repository cannot observe connection identity and so cannot
+catch a regression here; watch for `Encryption backfill advisory lock ... failed to
+release` in the logs, which would indicate exactly that regression.
+
+**Watch for `ENCRYPTION_BACKFILL_ROW_FAILED`.** Rows that could not be decrypted are
+skipped, not retried — the sweep advances past them deliberately so one bad row cannot
+stall it. Any occurrence needs investigating before Phase C, because those rows will
+still be untagged when the gate is measured.
+
+**A row with a `NULL` facts column is rewritten to `''`.** `FactsEncryptor` treats
+`NULL` and an empty ciphertext string identically on read (both decode to an empty
+map), so this is functionally harmless — but it is a real `NULL`→`''` change at the
+column level, on top of the `updated_at` bump every touched row gets. Relevant to
+owner approval item 5 below, which is already about that column.
+
+**Restarting a completed sweep.** Delete the relevant row from
+`encryption_backfill_progress`. There is no admin endpoint by design.
+
+**This does not close H-1.** Phase C — flipping `context-verification` to `enforce` —
+is gated on the `ENCRYPTION_CONTEXT_LEGACY` marker reading zero across an observation
+window that has not yet been decided.
