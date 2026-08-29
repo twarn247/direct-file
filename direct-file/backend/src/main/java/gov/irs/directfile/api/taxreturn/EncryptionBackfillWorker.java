@@ -43,6 +43,13 @@ public class EncryptionBackfillWorker {
     /** Stable marker for progress lines. Operators watch this to track the sweep. */
     private static final String PROGRESS_MARKER = "ENCRYPTION_BACKFILL_PROGRESS";
 
+    /**
+     * Stable marker for a failed advisory-lock release. Operators alert on this: it is the
+     * only signal that the tick stopped being pinned to one connection, which no unit test
+     * can detect (see the backfill section of README.md).
+     */
+    public static final String LOCK_RELEASE_FAILURE_MARKER = "ENCRYPTION_BACKFILL_LOCK_RELEASE_FAILED";
+
     /** String.hashCode() is specified and stable across JVM restarts, unlike Object.hashCode(). */
     private static final int LOCK_ID = "encryption-backfill-sweep".hashCode();
 
@@ -116,8 +123,9 @@ public class EncryptionBackfillWorker {
         } finally {
             if (!advisoryLockRepository.releaseLock(LOCK_ID)) {
                 log.warn(
-                        "Encryption backfill advisory lock (id={}) failed to release -- it will remain held "
-                                + "on this connection until the connection pool evicts it",
+                        "{}: advisory lock (id={}) failed to release -- it will remain held "
+                                + "until this connection is returned to the pool and reset",
+                        LOCK_RELEASE_FAILURE_MARKER,
                         LOCK_ID);
             }
         }

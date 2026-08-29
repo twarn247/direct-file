@@ -9,6 +9,7 @@ import gov.irs.directfile.api.taxreturn.models.EncryptionBackfillProgress;
 import gov.irs.directfile.api.taxreturn.submissions.lock.AdvisoryLockRepository;
 import gov.irs.directfile.models.autoconfigure.EncryptionContextProperties;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -160,5 +161,14 @@ class EncryptionBackfillWorkerTest {
         worker.tick();
 
         verify(service).processNextBatch(EncryptionBackfillProgress.TAX_RETURN_SUBMISSIONS, 100);
+    }
+
+    @Test
+    void lockReleaseFailureMarkerIsStable() {
+        // This constant is what the README tells operators to alert on, and it is the only
+        // signal that the connection-pinning regression the README describes has occurred.
+        // Changing it is a breaking change to an operational interface.
+        assertThat(EncryptionBackfillWorker.LOCK_RELEASE_FAILURE_MARKER)
+                .isEqualTo("ENCRYPTION_BACKFILL_LOCK_RELEASE_FAILED");
     }
 }
