@@ -136,8 +136,8 @@ public class StateApiController implements StateApi {
     public ResponseEntity<GetStateProfileResponse> getStateProfile(StateOrProvince stateCode) {
         MDC.put(AuditLogElement.STATE_ID.toString(), stateCode.name());
 
-        // Calling this function to ensure that USER_TIN and USER_TIN_TYPE are included
-        // in the audit log
+        // Calling this function to ensure that USER_TIN_LAST4 and USER_TIN_TYPE are
+        // included in the audit log
         userService.getCurrentUserInfo();
 
         return new ResponseEntity<>(

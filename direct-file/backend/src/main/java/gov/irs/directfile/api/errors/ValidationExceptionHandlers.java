@@ -103,11 +103,20 @@ public class ValidationExceptionHandlers {
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     @ExceptionHandler(Exception.class)
     public ErrorResponse handleUnhandledException(Exception ex, HandlerMethod handlerMethod) {
+        // The errors map must not carry ex.getMessage(): for an unexpected failure that
+        // message can be anything a wrapped exception's toString() produced --
+        // TaxReturnController funnels failures through `new RuntimeException(e)`, whose
+        // message becomes `e.toString()`, i.e. the wrapped driver/persistence exception's
+        // own class name and detail. This advice intercepts the exception before any
+        // /error forward happens, so server.error.include-message does not govern this
+        // path; the safe class-simple-name form already used for the top-level message is
+        // reused here instead of generateErrorResponseMessage(ex).
+        String safeMessage = String.format("Encountered %s", ex.getClass().getSimpleName());
         return logExceptionAndGenerateErrorResponse(
                 handlerMethod.getMethodAnnotation(Auditable.class),
                 ex,
-                String.format("Encountered %s", ex.getClass().getSimpleName()),
-                Map.of(ex.getClass().getName(), generateErrorResponseMessage(ex)));
+                safeMessage,
+                Map.of(ex.getClass().getName(), safeMessage));
     }
 
     private ErrorResponse logExceptionAndGenerateErrorResponse(
