@@ -96,7 +96,7 @@ public class LoggerExtension implements BeforeEachCallback, AfterEachCallback {
         }
 
         assertEquals(event.getTaxPeriod(), combinedMap.get(AuditLogElement.TAX_PERIOD.toString()));
-        assertEquals(event.getUserTin(), combinedMap.get(AuditLogElement.USER_TIN.toString()));
+        assertEquals(event.getUserTin(), combinedMap.get(AuditLogElement.USER_TIN_LAST4.toString()));
         assertEquals(event.getUserTinType(), combinedMap.get(AuditLogElement.USER_TIN_TYPE.toString()));
 
         if (logPropertiesToAssert != null) {

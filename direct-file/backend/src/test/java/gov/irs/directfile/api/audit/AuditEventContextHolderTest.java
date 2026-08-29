@@ -14,10 +14,10 @@ public class AuditEventContextHolderTest {
     @Test
     public void givenSetFields_whenGetEventContextProperties_thenReturnsMapOfProperties() {
         AuditEventContextHolder auditEventContextHolder = new AuditEventContextHolder();
-        auditEventContextHolder.addValueToEventMap(AuditLogElement.USER_TIN, "test-tin");
+        auditEventContextHolder.addValueToEventMap(AuditLogElement.USER_TIN_LAST4, "test-tin");
         auditEventContextHolder.addValueToEventMap(AuditLogElement.USER_TIN_TYPE, TinType.INDIVIDUAL.toString());
         Map<String, String> expectedMap = Map.of(
-                "userTin", "test-tin",
+                "userTinLast4", "test-tin",
                 "userTinType", "0");
         Map<String, Object> eventsMap = auditEventContextHolder.getEventContextProperties();
         assertEquals(expectedMap, eventsMap);

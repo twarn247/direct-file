@@ -408,6 +408,16 @@ carries a bound encryption purpose. Off by default.
 | `direct-file.encryption.backfill.batch-size` | `100` | Rows per tick |
 | `direct-file.encryption.backfill.fixed-delay-millis` | `5000` | Delay between ticks |
 
+**Raising `batch-size` lengthens how long a snapshot is held.** `tick()` is
+`@Transactional` for the whole batch — that is what pins the advisory lock to one
+connection — so the outer transaction stays open until the batch finishes. A longer
+transaction holds its snapshot longer, which delays `VACUUM` reclaiming the dead tuples
+this sweep itself generates (every row it touches is an update). At the default of 100
+this is irrelevant. If you raise it into five figures to finish the sweep faster, watch
+table bloat on `taxreturns` and `taxreturn_submissions`, and prefer a shorter
+`fixed-delay-millis` over a larger `batch-size` — more, smaller transactions get through
+the same rows without holding a snapshot open.
+
 **Prerequisites.** `direct-file.encryption.context-verification` must be `warn` — the
 application refuses to start with the backfill enabled under `enforce`, because untagged
 ciphertext cannot be read in that mode. The two owner approvals in
@@ -428,8 +438,8 @@ connection across acquire, work, and release. Before enabling against a
 multi-replica deployment for the first time, prove this against a real Postgres with
 two instances (or two threads) running concurrently, watching `pg_locks` — a unit
 test with a mocked lock repository cannot observe connection identity and so cannot
-catch a regression here; watch for `Encryption backfill advisory lock ... failed to
-release` in the logs, which would indicate exactly that regression.
+catch a regression here; alert on the marker `ENCRYPTION_BACKFILL_LOCK_RELEASE_FAILED`, which indicates exactly
+that regression.
 
 **Watch for `ENCRYPTION_BACKFILL_ROW_FAILED`.** Rows that could not be decrypted are
 skipped, not retried — the sweep advances past them deliberately so one bad row cannot

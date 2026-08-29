@@ -29,9 +29,29 @@ public class UserService {
 
     public UserInfo getCurrentUserInfo() {
         IdentityAttributes attributes = identitySupplier.get();
-        auditService.addEventProperty(AuditLogElement.USER_TIN, attributes.tin());
+        auditService.addEventProperty(AuditLogElement.USER_TIN_LAST4, lastFour(attributes.tin()));
         auditService.addEventProperty(AuditLogElement.USER_TIN_TYPE, TinType.INDIVIDUAL.toString());
         return new UserInfo(attributes.id(), attributes.externalId(), attributes.email(), attributes.tin());
+    }
+
+    /**
+     * The last four digits of a TIN, for audit correlation.
+     *
+     * <p>The full TIN must not enter the audit event map: AuditService serializes every
+     * property in that map as a fluent key-value pair, so whether it reaches log output
+     * depends entirely on each encoder's allowlist. Four digits support the correlation an
+     * investigator actually performs without putting the identifier itself one
+     * configuration mistake away from being logged.
+     *
+     * <p>Returns null for a null TIN — AuditService.addEventProperty already ignores null
+     * values — and returns the input unchanged if it is shorter than four characters,
+     * rather than throwing.
+     */
+    private static String lastFour(String tin) {
+        if (tin == null) {
+            return null;
+        }
+        return tin.length() <= 4 ? tin : tin.substring(tin.length() - 4);
     }
 
     @Transactional(readOnly = true)

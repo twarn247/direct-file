@@ -24,7 +24,7 @@ public enum AuditLogElement {
     TAX_RETURN_ID,
     TIN_TYPE,
     TIMESTAMP,
-    USER_TIN,
+    USER_TIN_LAST4,
     USER_TIN_TYPE,
     USER_TYPE,
     DATA_IMPORT_BEHAVIOR;

@@ -55,7 +55,11 @@ server:
   port: ${DF_API_PORT:8080}
   shutdown: graceful
   error:
-    include-message: always
+    # never: exception messages must not reach API clients. Unexpected failures are
+    # funnelled through RuntimeException in places (e.g. TaxReturnController), so 'always'
+    # surfaces driver and persistence messages. Callers get the curated codes in
+    # gov.irs.directfile.api.errors instead.
+    include-message: never
   servlet:
     context-path: "${DF_API_PUBLIC_PATH:/df/file/api}"
   max-http-request-header-size: 16384

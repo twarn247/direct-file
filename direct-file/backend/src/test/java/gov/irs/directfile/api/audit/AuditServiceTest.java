@@ -26,13 +26,13 @@ public class AuditServiceTest {
 
     @SneakyThrows
     @Test
-    public void givenValidLogElementName_whenAddEventPropertiesForUserTin_thenUserTinLogAdded() {
+    public void givenValidLogElementName_whenAddEventPropertiesForUserTinLast4_thenUserTinLast4LogAdded() {
         // given
         // when
-        auditService.addEventProperty(AuditLogElement.USER_TIN, "test-tin");
+        auditService.addEventProperty(AuditLogElement.USER_TIN_LAST4, "test-tin");
 
         // then
-        verify(auditEventContextHolder, times(1)).addValueToEventMap(AuditLogElement.USER_TIN, "test-tin");
+        verify(auditEventContextHolder, times(1)).addValueToEventMap(AuditLogElement.USER_TIN_LAST4, "test-tin");
     }
 
     @SneakyThrows

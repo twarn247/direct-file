@@ -13,11 +13,14 @@ import gov.irs.directfile.api.audit.AuditLogElement;
 import gov.irs.directfile.api.audit.AuditService;
 import gov.irs.directfile.api.config.identity.IdentityAttributes;
 import gov.irs.directfile.api.config.identity.IdentitySupplier;
+import gov.irs.directfile.api.user.domain.UserInfo;
 import gov.irs.directfile.api.user.models.User;
 import gov.irs.directfile.audit.events.TinType;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -88,7 +91,43 @@ class UserServiceTest {
         userService.getCurrentUserInfo();
 
         // then
-        verify(auditService, times(1)).addEventProperty(AuditLogElement.USER_TIN, TIN);
+        verify(auditService, times(1)).addEventProperty(AuditLogElement.USER_TIN_LAST4, "3333");
         verify(auditService, times(1)).addEventProperty(AuditLogElement.USER_TIN_TYPE, TinType.INDIVIDUAL.toString());
+    }
+
+    @Test
+    void getCurrentUserInfo_recordsOnlyTheLastFourTinDigits() {
+        IdentityAttributes attributes =
+                new IdentityAttributes(UUID.randomUUID(), UUID.randomUUID(), "taxpayer@example.com", "123456789");
+        when(identitySupplier.get()).thenReturn(attributes);
+
+        userService.getCurrentUserInfo();
+
+        verify(auditService).addEventProperty(AuditLogElement.USER_TIN_LAST4, "6789");
+        verify(auditService, never()).addEventProperty(eq(AuditLogElement.USER_TIN_LAST4), eq("123456789"));
+    }
+
+    @Test
+    void getCurrentUserInfo_stillReturnsTheFullTinToCallers() {
+        IdentityAttributes attributes =
+                new IdentityAttributes(UUID.randomUUID(), UUID.randomUUID(), "taxpayer@example.com", "123456789");
+        when(identitySupplier.get()).thenReturn(attributes);
+
+        UserInfo info = userService.getCurrentUserInfo();
+
+        // The TIN is still needed by application code; this change is about what is logged.
+        assertThat(info.tin()).isEqualTo("123456789");
+    }
+
+    @Test
+    void getCurrentUserInfo_handlesAShortOrMissingTinWithoutThrowing() {
+        IdentityAttributes shortTin =
+                new IdentityAttributes(UUID.randomUUID(), UUID.randomUUID(), "taxpayer@example.com", "12");
+        when(identitySupplier.get()).thenReturn(shortTin);
+
+        userService.getCurrentUserInfo();
+
+        // Never pad, never substring past the end, never log more than four characters.
+        verify(auditService).addEventProperty(AuditLogElement.USER_TIN_LAST4, "12");
     }
 }
