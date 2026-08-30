@@ -1,0 +1,91 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A newer push to the same branch makes an in-flight run obsolete.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: Build and test Java services
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Set up sbt
+        uses: sbt/setup-sbt@v1
+
+      # The Scala compile is the slowest step in the pipeline and its output only
+      # changes when fact-graph-scala does. Keyed on that subtree alone so a change
+      # to any Java service still gets a cache hit.
+      - name: Cache Scala build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.ivy2/cache
+            ~/.sbt
+            ~/.cache/coursier
+            direct-file/fact-graph-scala/target
+            direct-file/fact-graph-scala/project/target
+          key: scala-${{ runner.os }}-${{ hashFiles('direct-file/fact-graph-scala/**/*.scala', 'direct-file/fact-graph-scala/build.sbt', 'direct-file/fact-graph-scala/project/build.properties') }}
+          restore-keys: |
+            scala-${{ runner.os }}-
+
+      # backend/pom.xml declares gov.irs.factgraph:fact-graph_3, which is not on
+      # Maven Central. publishM2 is the only thing that puts it in ~/.m2, so no
+      # service can compile until this runs. Mirrors scripts/build-fact-graph.sh.
+      - name: Publish fact-graph to the local Maven repository
+        working-directory: direct-file/fact-graph-scala
+        run: sbt compile package publishM2
+
+      # Builds the boms, data-models, and starters aggregate. Mirrors
+      # scripts/build-dependencies.sh.
+      - name: Install shared libraries
+        working-directory: direct-file/libs
+        run: ./mvnw --batch-mode --no-transfer-progress clean install
+
+      - name: Build and test backend
+        working-directory: direct-file/backend
+        run: ./mvnw --batch-mode --no-transfer-progress verify
+
+      - name: Build and test state-api
+        working-directory: direct-file/state-api
+        run: ./mvnw --batch-mode --no-transfer-progress verify
+
+      - name: Build and test status
+        working-directory: direct-file/status
+        run: ./mvnw --batch-mode --no-transfer-progress verify
+
+      - name: Build and test submit
+        working-directory: direct-file/submit
+        run: ./mvnw --batch-mode --no-transfer-progress verify
+
+      - name: Build and test email-service
+        working-directory: direct-file/email-service
+        run: ./mvnw --batch-mode --no-transfer-progress verify
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-reports
+          path: direct-file/*/target/surefire-reports/
+          if-no-files-found: warn
+          retention-days: 14
