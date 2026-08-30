@@ -25,6 +25,7 @@
       <includeKeyValueKeyName>eventTimestamp</includeKeyValueKeyName>
       <includeKeyValueKeyName>eventStatus</includeKeyValueKeyName>
       <includeKeyValueKeyName>eventId</includeKeyValueKeyName>
+      <includeKeyValueKeyName>userTin</includeKeyValueKeyName>
 
       <throwableConverter class="gov.irs.directfile.audit.NoMessageStackTraceConverter" />
     </encoder>
