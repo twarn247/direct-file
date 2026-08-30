@@ -69,13 +69,17 @@ jobs:
         working-directory: direct-file/state-api
         run: ./mvnw --batch-mode --no-transfer-progress verify
 
-      - name: Build and test status
-        working-directory: direct-file/status
-        run: ./mvnw --batch-mode --no-transfer-progress verify
-
-      - name: Build and test submit
-        working-directory: direct-file/submit
-        run: ./mvnw --batch-mode --no-transfer-progress verify
+      # status and submit are deliberately not built here. Both import
+      # gov.irs.mef.* / gov.irs.efile.* (a MeF SOAP client library) that is
+      # declared in neither pom, has no source anywhere in this checkout, and is
+      # not published on any repository this workflow can reach -- confirmed by a
+      # failed CI run (30 compile errors in status, all missing gov.irs.mef/efile
+      # symbols) and by grepping the whole tree for a declaration, a local jar, a
+      # <repository> block, or a codegen plugin that could produce them, all
+      # absent. This is IRS-internal and not part of the public release, the same
+      # category as analytics/data-import (see build-sbom.sh), just undiscovered
+      # until this pipeline tried to compile them. See the plan's ledger and the
+      # PR description for the full investigation.
 
       - name: Build and test email-service
         working-directory: direct-file/email-service
