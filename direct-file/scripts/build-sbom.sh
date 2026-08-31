@@ -11,6 +11,10 @@
 # This script makes use of the cyclonedx cli, https://github.com/CycloneDX/cyclonedx-cli.
 # You can install it via `brew install cyclonedx/cyclonedx/cyclonedx-cli`
 
+# Note: the analytics and data-import modules referenced by earlier versions of this
+# script are not present in this repository (they are not part of the public release),
+# so they are not generated or merged here.
+
 set -e
 
 VERSION="SNAPSHOT"
@@ -27,9 +31,6 @@ cd backend
 echo "Writing email-service sbom"
 cd ../email-service
 ./mvnw cyclonedx:makeBom
-echo "Writing analytics sbom"
-cd ../analytics
-./mvnw cyclonedx:makeBom
 echo "Writing state-api sbom"
 cd ../state-api
 ./mvnw cyclonedx:makeBom
@@ -38,9 +39,6 @@ cd ../status
 ./mvnw cyclonedx:makeBom
 echo "Writing submit sbom"
 cd ../submit
-./mvnw cyclonedx:makeBom
-echo "Writing data-import sbom"
-cd ../data-import
 ./mvnw cyclonedx:makeBom
 echo "Writing fact-graph sbom"
 cd ../fact-graph-scala
@@ -60,11 +58,9 @@ cd "$WD"
 cyclonedx merge --input-files \
   backend/target/bom.json \
   email-service/target/bom.json \
-  analytics/target/bom.json \
   submit/target/bom.json \
   status/target/bom.json \
   state-api/target/bom.json \
-  data-import/target/bom.json \
   fact-graph-scala/target/fact-graph-0.1.0-SNAPSHOT.bom.xml \
   fact-graph-scala/js/target/fact-graph-0.1.0-SNAPSHOT.bom.xml \
   fact-graph-scala/jvm/target/fact-graph-0.1.0-SNAPSHOT.bom.xml \
