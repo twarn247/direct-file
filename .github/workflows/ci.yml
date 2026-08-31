@@ -297,7 +297,17 @@ jobs:
           # this at a nonexistent file would break setup-node's cache-key computation.
           cache-dependency-path: direct-file/df-client/package-lock.json
 
+      # df-client-app is an npm workspace member, not a standalone project: some tools
+      # (stylelint among them) are declared as devDependencies at the workspace root
+      # (direct-file/df-client/package.json) rather than in df-client-app's own
+      # package.json. Running `npm ci` scoped to df-client-app alone installs only
+      # its own direct dependency tree and silently skips those -- confirmed by
+      # reproducing "stylelint: not found" locally with exactly this working
+      # directory, then fixing it by installing from the workspace root instead.
+      # Once installed there, the later steps' ancestor node_modules/.bin lookup
+      # resolves correctly from df-client-app, so only this one step needs to move.
       - name: Install dependencies
+        working-directory: direct-file/df-client
         run: npm ci
 
       # Both lint scripts run with --max-warnings=0. prelint:ts runs tsc --build, so this
