@@ -195,16 +195,59 @@ jobs:
             echo "::endgroup::"
           done
 
-      - name: Upload SARIF to the security tab
+      # One step per module rather than a single directory upload: GitHub Code
+      # Scanning stopped combining multiple SARIF runs uploaded under the same
+      # category (confirmed by a failed run -- "The CodeQL Action does not support
+      # uploading multiple SARIF runs with the same category"), so each module's
+      # SARIF needs its own upload-sarif call with a distinct category. Six
+      # explicit steps rather than a loop, matching this workflow's existing
+      # single-sequential-job philosophy: obviously correct over clever.
+      - name: Upload SARIF (backend)
         if: always()
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: trivy-results/
-          category: trivy-dependencies
+          sarif_file: trivy-results/backend.sarif
+          category: trivy-backend
+
+      - name: Upload SARIF (state-api)
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-results/state-api.sarif
+          category: trivy-state-api
+
+      - name: Upload SARIF (status)
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-results/status.sarif
+          category: trivy-status
+
+      - name: Upload SARIF (submit)
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-results/submit.sarif
+          category: trivy-submit
+
+      - name: Upload SARIF (email-service)
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-results/email-service.sarif
+          category: trivy-email-service
+
+      - name: Upload SARIF (libs/data-models)
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-results/libs-data-models.sarif
+          category: trivy-data-models
 
       - name: Summarise findings
         if: always()
         run: |
           echo "### Dependency scan" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "Reporting-only. Findings are in the Security tab under 'trivy-dependencies'." >> "$GITHUB_STEP_SUMMARY"
+          echo "Reporting-only. Findings are in the Security tab, one category per module:" >> "$GITHUB_STEP_SUMMARY"
+          echo "trivy-backend, trivy-state-api, trivy-status, trivy-submit, trivy-email-service, trivy-data-models." >> "$GITHUB_STEP_SUMMARY"
