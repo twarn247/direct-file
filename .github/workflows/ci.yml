@@ -5,14 +5,16 @@ on:
   push:
     branches: [main]
 
-# A newer push to the same branch makes an in-flight run obsolete.
+# A newer push to the same PR branch makes an in-flight run obsolete. Only for
+# pull_request: this group also covers push-to-main runs (via github.ref), and
+# cancelling those would leave an earlier main commit without a completed
+# status once build-and-test becomes a required check (handback item 1).
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
-  security-events: write
 
 jobs:
   build-and-test:
@@ -21,23 +23,23 @@ jobs:
     timeout-minutes: 60
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
         with:
           distribution: temurin
           java-version: '21'
           cache: maven
 
       - name: Set up sbt
-        uses: sbt/setup-sbt@v1
+        uses: sbt/setup-sbt@c7d2d6258b4bd0d3ec5129e6b3453199d3c79729 # v1.5.8
 
       # The Scala compile is the slowest step in the pipeline and its output only
       # changes when fact-graph-scala does. Keyed on that subtree alone so a change
       # to any Java service still gets a cache hit.
       - name: Cache Scala build
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: |
             ~/.ivy2/cache
@@ -88,7 +90,7 @@ jobs:
 
       - name: Upload test reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: surefire-reports
           path: direct-file/*/target/surefire-reports/
@@ -100,22 +102,29 @@ jobs:
     runs-on: ubuntu-latest
     needs: build-and-test
     timeout-minutes: 30
+    # security-events: write is scoped to this job only. build-and-test runs mvn
+    # verify, which executes plugin and test code drawn from the same dependency
+    # tree this job measures at 31 CRITICAL / 257 HIGH -- that step should not
+    # also hold write access to code scanning.
+    permissions:
+      contents: read
+      security-events: write
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
         with:
           distribution: temurin
           java-version: '21'
           cache: maven
 
       - name: Set up sbt
-        uses: sbt/setup-sbt@v1
+        uses: sbt/setup-sbt@c7d2d6258b4bd0d3ec5129e6b3453199d3c79729 # v1.5.8
 
       - name: Restore Scala build
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: |
             ~/.ivy2/cache
@@ -164,14 +173,14 @@ jobs:
           ls -la ../sboms
 
       - name: Upload SBOMs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: cyclonedx-sboms
           path: sboms/
           retention-days: 30
 
       - name: Set up Trivy
-        uses: aquasecurity/setup-trivy@v0.3.1
+        uses: aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567 # v0.3.1
 
       # trivy's `sbom` subcommand scans one artifact at a time (it is a direct passthrough
       # to `trivy sbom <path>`, confirmed by reading aquasecurity/trivy-action's own
@@ -180,20 +189,31 @@ jobs:
       # document as supported for this scan type. Reporting-only for now: exit-code 0
       # means findings never fail the job. See the handback: this becomes blocking once
       # the existing backlog is known and triaged.
+      # No set -e: a genuine scan error on one module (a malformed SBOM, a
+      # vulnerability-DB fetch failure -- --exit-code 0 already means a *finding*
+      # never fails this) must not abort the loop before the remaining modules are
+      # scanned. Every module is attempted; the step fails at the end if any of
+      # them had a real error, so one bad module reads as one failure rather than
+      # cascading into five more when the later upload-sarif steps find missing
+      # files.
       - name: Scan SBOMs with Trivy
         run: |
-          set -e
           mkdir -p trivy-results
+          status=0
           for f in sboms/*.bom.json; do
             name=$(basename "$f" .bom.json)
             echo "::group::Scanning $name"
-            trivy sbom "$f" \
-              --format sarif \
-              --output "trivy-results/$name.sarif" \
-              --severity CRITICAL,HIGH \
-              --exit-code 0
+            if ! trivy sbom "$f" \
+                  --format sarif \
+                  --output "trivy-results/$name.sarif" \
+                  --severity CRITICAL,HIGH \
+                  --exit-code 0; then
+              echo "::error::Trivy failed to scan $name (a real scan error, not a vulnerability finding)"
+              status=1
+            fi
             echo "::endgroup::"
           done
+          exit "$status"
 
       # One step per module rather than a single directory upload: GitHub Code
       # Scanning stopped combining multiple SARIF runs uploaded under the same
@@ -203,43 +223,47 @@ jobs:
       # explicit steps rather than a loop, matching this workflow's existing
       # single-sequential-job philosophy: obviously correct over clever.
       - name: Upload SARIF (backend)
-        if: always()
-        uses: github/codeql-action/upload-sarif@v3
+        # GITHUB_TOKEN on a fork-triggered pull_request is read-only regardless of
+        # the permissions block above, so these six steps would fail on every
+        # external contributor's PR without this guard. Runs unconditionally on
+        # push (no pull_request context to check) and on same-repo pull_requests.
+        if: always() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: github/codeql-action/upload-sarif@6f5948dfacef28e207b48d0905cf90c03365536d # v3.37.9
         with:
           sarif_file: trivy-results/backend.sarif
           category: trivy-backend
 
       - name: Upload SARIF (state-api)
-        if: always()
-        uses: github/codeql-action/upload-sarif@v3
+        if: always() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: github/codeql-action/upload-sarif@6f5948dfacef28e207b48d0905cf90c03365536d # v3.37.9
         with:
           sarif_file: trivy-results/state-api.sarif
           category: trivy-state-api
 
       - name: Upload SARIF (status)
-        if: always()
-        uses: github/codeql-action/upload-sarif@v3
+        if: always() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: github/codeql-action/upload-sarif@6f5948dfacef28e207b48d0905cf90c03365536d # v3.37.9
         with:
           sarif_file: trivy-results/status.sarif
           category: trivy-status
 
       - name: Upload SARIF (submit)
-        if: always()
-        uses: github/codeql-action/upload-sarif@v3
+        if: always() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: github/codeql-action/upload-sarif@6f5948dfacef28e207b48d0905cf90c03365536d # v3.37.9
         with:
           sarif_file: trivy-results/submit.sarif
           category: trivy-submit
 
       - name: Upload SARIF (email-service)
-        if: always()
-        uses: github/codeql-action/upload-sarif@v3
+        if: always() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: github/codeql-action/upload-sarif@6f5948dfacef28e207b48d0905cf90c03365536d # v3.37.9
         with:
           sarif_file: trivy-results/email-service.sarif
           category: trivy-email-service
 
       - name: Upload SARIF (libs/data-models)
-        if: always()
-        uses: github/codeql-action/upload-sarif@v3
+        if: always() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: github/codeql-action/upload-sarif@6f5948dfacef28e207b48d0905cf90c03365536d # v3.37.9
         with:
           sarif_file: trivy-results/libs-data-models.sarif
           category: trivy-data-models
