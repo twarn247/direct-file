@@ -170,3 +170,49 @@ awslocal sqs send-message --queue-url <source-queue-url> --message-body "Your me
 
 awslocal sqs receive-message --queue-url <source-queue-url> --message-attribute-names All
 ```
+
+## Continuous integration
+
+`.github/workflows/ci.yml` runs on every pull request and on pushes to `main`.
+
+**`build-and-test`** publishes the Scala fact-graph to the local Maven repository,
+installs the shared `libs`, then runs `./mvnw verify` for `backend`, `state-api`, and
+`email-service`. `verify` includes Spotless, PMD, and SpotBugs as well as the test
+suites.
+
+The fact-graph step is not optional: `backend/pom.xml` depends on
+`gov.irs.factgraph:fact-graph_3`, which is not published to Maven Central and reaches
+`~/.m2` only via `sbt publishM2`. This mirrors `scripts/build-dependencies.sh`.
+
+**`status` and `submit` are not built here.** Both import a MeF SOAP client library
+(`gov.irs.mef.*` / `gov.irs.efile.*`) that is declared in neither module's `pom.xml`,
+has no source anywhere in this checkout, and is not published on any repository this
+workflow can reach — it is IRS-internal and not part of the public release, discovered
+when this pipeline's first run failed to compile `status` with 30 missing-symbol
+errors. Their SBOMs are still generated in `dependency-scan` below, since
+`cyclonedx:makeBom` only needs each module's declared dependencies to resolve, not its
+own source to compile.
+
+`state-api`'s integration tests are gated behind `-DrunIntegrationTests` and need
+Docker; CI does not run them. Run them locally with `state-api/integrationtest.sh`.
+
+**`dependency-scan`** generates a CycloneDX SBOM for each buildable-or-not module
+(`backend`, `state-api`, `status`, `submit`, `email-service`, `libs/data-models`) and
+scans each with Trivy. Results appear in the Security tab, one category per module
+(`trivy-backend`, `trivy-state-api`, `trivy-status`, `trivy-submit`,
+`trivy-email-service`, `trivy-data-models`) — GitHub Code Scanning no longer combines
+multiple SARIF runs uploaded under a shared category, so each module gets its own
+upload step. **It is currently reporting-only and does not fail the build** — see the
+handback in `docs/superpowers/plans/2026-08-29-ci-pipeline-and-dependency-scanning.md`.
+
+### Reproducing a CI failure locally
+
+```sh
+cd direct-file/fact-graph-scala && sbt compile package publishM2
+cd ../libs && ./mvnw clean install
+cd ../backend && ./mvnw verify     # or state-api / email-service
+```
+
+Not the React client, the fact-graph's own test suite, or `status`/`submit` — none of
+the three is in CI yet, `status`/`submit` because they cannot compile in this
+environment (see above), the others as documented follow-ups.
