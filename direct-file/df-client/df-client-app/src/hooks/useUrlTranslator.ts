@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { useCallback } from 'react';
-import { getTranslatedLink, LANGUAGE_CODE_PLACEHOLDER, urlHasLanguagePlaceholder } from '../utils/urlUtils.js';
+import { getTranslatedLink, urlHasLanguagePlaceholder } from '../utils/urlUtils.js';
 import { StateProfile } from '../types/StateProfile.js';
 
 const DEFAULT_LANGUAGE_CODE = `en`;
@@ -30,7 +30,6 @@ const useUrlTranslator = () => {
   const translateStateProfileUrls = useCallback(
     (stateProfile: StateProfile): StateProfile => {
       const {
-        stateCode,
         landingUrl,
         defaultRedirectUrl,
         transferCancelUrl,

@@ -19,13 +19,8 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, State> {
     this.state = { hasError: false };
   }
 
-  componentDidCatch = async (inputError: Error, errorInfo: ErrorInfo) => {
+  componentDidCatch = async (_inputError: Error, _errorInfo: ErrorInfo) => {
     this.setState({ hasError: true });
-    const { componentStack, digest } = errorInfo;
-    const payload: ReactErrorPayload = {
-      componentStack: componentStack || null,
-      digest: digest || null,
-    };
   };
 
   render() {

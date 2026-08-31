@@ -10,7 +10,7 @@ import { YamlSettings } from '../locales/yaml-settings.js';
  */
 const LOCALE_ROOT = `${__dirname}/../locales`;
 
-function handleWriteFileError(targetName: string) {
+function handleWriteFileError(_targetName: string) {
   return (error: NodeJS.ErrnoException | null) => {
     if (error) {
       return null;

@@ -1,7 +1,6 @@
 import { CommonContentDisplayProps, CommonContentDisplay } from '@irs/df-common';
 import Translation from '../Translation/index.js';
 import { useMemo } from 'react';
-import { isBeforeResubmissionDeadline } from '../../utils/dateUtils.js';
 
 export type ContentDisplayProps = Omit<CommonContentDisplayProps, 'TranslationComponent'> & {
   allowedTags?: string[] | undefined;
@@ -12,8 +11,6 @@ export type ContentDisplayProps = Omit<CommonContentDisplayProps, 'TranslationCo
 export const BareContentDisplay = ({ additionalComponents, ...props }: ContentDisplayProps) => {
   // Make sure the customersupportLink is available, if needed
   const innerAdditionalComponents = useMemo(() => {
-    const now = new Date();
-
     return {
       ...additionalComponents,
     };

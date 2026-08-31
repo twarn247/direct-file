@@ -66,11 +66,6 @@ describe(`Tax Return Card`, () => {
     fireEvent.click(button);
     await new Promise((r) => setTimeout(r));
     expect(useApiHook.save).toHaveBeenCalledTimes(1);
-
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore: typescript doesn't like me accessing mocked method call arguments like this
-    const saveFunctionArguments = useApiHook.save.mock.calls[0];
-    const requestBody = saveFunctionArguments[1].body;
   });
 
   it(`Blocks new users from entering flow when flow is disabled for a given environment`, async () => {

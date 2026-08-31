@@ -31,8 +31,7 @@ const systemAlertSlice = createSlice({
     deleteSystemAlert: (state, action: PayloadAction<SystemAlertKey>) => {
       const key = action.payload;
       const existingConfig = state.data[key];
-      if (!existingConfig) {
-      } else {
+      if (existingConfig) {
         delete state.data[key]; // Remove the alert
       }
     },

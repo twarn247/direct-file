@@ -74,6 +74,8 @@ export const AllScreensScreenWrapper = memo(
                 collectionId={uuid}
                 screenContent={screen.content}
                 setFactActionPaths={[]}
+                // Navigation is meaningless when statically rendering every screen for preview.
+                // eslint-disable-next-line @typescript-eslint/no-empty-function
                 gotoNextScreen={() => {}}
                 alertAggregatorType={screen.alertAggregatorType}
                 componentsToHide={hideAlerts ? new Set(ALERT_COMPONENT_TYPES) : undefined}

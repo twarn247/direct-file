@@ -49,7 +49,6 @@ function BaseScreen() {
         // eslint-disable-next-line eqeqeq
         navigateToDataViewAtEndOfSubSubCategory: isReviewMode == `true`,
       });
-      console.log(`🚀 ~ gotoNextScreen ~ nextPath:`, nextPath);
       navigate(nextPath.routable.fullRoute(nextPath.collectionId), {
         state: {
           from: currentUrl,

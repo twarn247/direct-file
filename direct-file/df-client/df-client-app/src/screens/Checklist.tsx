@@ -19,7 +19,6 @@ export interface ChecklistProps {
 const Checklist: FC = () => {
   useInitializeChecklist();
   const { t } = useTranslation();
-  const { t: tStates } = useTranslation(`translation`, { keyPrefix: `enums.statesAndProvinces` });
 
   const categoryRefs = useRef(new Map<string, MutableRefObject<HTMLAnchorElement>>());
   const checklistState = useChecklistState();

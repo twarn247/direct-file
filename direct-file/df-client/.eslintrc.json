@@ -89,7 +89,8 @@
       "files": ["**/*.test.{ts,tsx}"],
       "rules": {
         "@typescript-eslint/no-empty-function": "off",
-        "df-rules/no-factgraph-save": "off"
+        "df-rules/no-factgraph-save": "off",
+        "@typescript-eslint/no-non-null-assertion": "off"
       }
     }
   ],

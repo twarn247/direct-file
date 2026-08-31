@@ -26,7 +26,7 @@ export const useSaveAndPersist = () => {
           hasPersistError: false,
         };
       })
-      .catch((e) => {
+      .catch((_e) => {
         const config: SetSystemAlertConfig = {
           type: `error`,
           i18nKey: `generic.serverError`,
