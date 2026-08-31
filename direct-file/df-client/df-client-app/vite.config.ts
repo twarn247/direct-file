@@ -1,4 +1,5 @@
 import { UserConfig, defineConfig } from 'vitest/config';
+import { loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import browserslistToEsbuild from 'browserslist-to-esbuild';
 import { JSON_SCHEMA } from 'js-yaml';
@@ -100,4 +101,22 @@ export const configOptions: UserConfig = {
 };
 
 // https://vitejs.dev/config/
-export default defineConfig(configOptions);
+export default defineConfig(({ mode }) => {
+  // App.tsx reads ?testEmail= and ?generateUUID into sessionStorage/localStorage when
+  // this flag is set. Vite resolves VITE_* from .env files AND the process environment,
+  // so the absence of a .env.production is not a guarantee -- a CI variable or a Docker
+  // ENV would switch these hooks on in a shipped bundle. Fail the build instead.
+  const env = loadEnv(mode, process.cwd(), 'VITE_');
+  const testDataEnabled = env.VITE_ALLOW_LOADING_TEST_DATA;
+  const isTruthy = testDataEnabled !== undefined && testDataEnabled !== '' && testDataEnabled !== 'false';
+
+  if (mode === 'production' && isTruthy) {
+    throw new Error(
+      `VITE_ALLOW_LOADING_TEST_DATA is set to "${testDataEnabled}" for a production build. ` +
+        `These hooks read query parameters into browser storage and must never ship. ` +
+        `Unset it, or build with --mode=development.`
+    );
+  }
+
+  return configOptions;
+});
