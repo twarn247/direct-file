@@ -275,3 +275,44 @@ jobs:
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "Reporting-only. Findings are in the Security tab, one category per module:" >> "$GITHUB_STEP_SUMMARY"
           echo "trivy-backend, trivy-state-api, trivy-status, trivy-submit, trivy-email-service, trivy-data-models." >> "$GITHUB_STEP_SUMMARY"
+
+  client:
+    name: Lint and test the client
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: direct-file/df-client/df-client-app
+
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: direct-file/df-client/.nvmrc
+          cache: npm
+          # df-client-app has no lockfile of its own -- it's an npm workspace member.
+          # The real lockfile (and workspace root) is direct-file/df-client/. Pointing
+          # this at a nonexistent file would break setup-node's cache-key computation.
+          cache-dependency-path: direct-file/df-client/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Both lint scripts run with --max-warnings=0. prelint:ts runs tsc --build, so this
+      # also type-checks.
+      - name: Lint
+        run: npm run lint
+
+      # Three suites because the repository splits them that way: test:ci excludes the
+      # completeness, functional-flow, and all-screens directories, which :2 and :3 cover.
+      # Running only test:ci would silently skip them.
+      - name: Test
+        run: npm run test:ci
+
+      - name: Test (completeness and functional flows)
+        run: npm run test:ci:2
+
+      - name: Test (all screens)
+        run: npm run test:ci:3
