@@ -317,12 +317,19 @@ jobs:
 
       # Three suites because the repository splits them that way: test:ci excludes the
       # completeness, functional-flow, and all-screens directories, which :2 and :3 cover.
-      # Running only test:ci would silently skip them.
+      # if: always() on the latter two is load-bearing, not decorative: GitHub Actions
+      # halts a job at the first failed step by default, and test:ci currently fails on
+      # a pre-existing backlog (see README) -- without this, :2 and :3 would never run
+      # at all, silently, which is exactly the hazard the comment above already warned
+      # about, just from the opposite direction (a skipped step instead of a skipped file
+      # pattern). Confirmed via a real CI run that this was already happening.
       - name: Test
         run: npm run test:ci
 
       - name: Test (completeness and functional flows)
+        if: always()
         run: npm run test:ci:2
 
       - name: Test (all screens)
+        if: always()
         run: npm run test:ci:3
