@@ -476,7 +476,9 @@ direct-file:
   feature-flags:
     allowlist:
       enabled: false
-      hex-key: "key"
+      # No committed default. Set DF_FEATURE_FLAGS_ALLOWLIST_HEX_KEY (>= 32 bytes, hex-encoded)
+      # when enabling. EmailAllowlistFeatureService refuses to start without it.
+      hex-key: ${DF_FEATURE_FLAGS_ALLOWLIST_HEX_KEY:}
       object-key: "allowlist-export.csv"
     open-enrollment:
       enabled: true

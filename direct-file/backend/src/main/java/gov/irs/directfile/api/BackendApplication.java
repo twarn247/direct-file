@@ -13,6 +13,7 @@ import gov.irs.directfile.api.config.*;
 @SpringBootApplication
 @EnableScheduling
 @EnableConfigurationProperties({
+    gov.irs.directfile.api.authorization.config.FeatureFlagConfigurationProperties.class,
     StateApiEndpointProperties.class,
     StateApiFeatureFlagProperties.class,
     StatusEndpointProperties.class,
