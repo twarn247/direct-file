@@ -19,14 +19,20 @@ describe(`test:ci quarantine list`, () => {
     // --exclude 'src/{a/*,b/*,misc/apiHelpers.test.ts}'. Repeated --exclude flags are not
     // supported by this vitest CLI version (it throws "Expected a single value for option").
     const excludeMatch = testCiScript.match(/--exclude '([^']+)'/);
-    expect(excludeMatch, `test:ci script must have an --exclude flag`).not.toBeNull();
+    if (!excludeMatch) {
+      throw new Error(`test:ci script must have an --exclude flag`);
+    }
 
-    const excludeGlob = excludeMatch![1];
+    const excludeGlob = excludeMatch[1];
     const braceMatch = excludeGlob.match(/^src\/\{(.+)\}$/);
-    expect(braceMatch, `expected a single src/{...} brace-expanded glob, got: ${excludeGlob}`).not.toBeNull();
+    if (!braceMatch) {
+      throw new Error(`expected a single src/{...} brace-expanded glob, got: ${excludeGlob}`);
+    }
 
-    const entries = braceMatch![1].split(`,`).map((entry) => `src/${entry}`);
-    const quarantinedFiles = entries.filter((entry) => entry.endsWith(`.test.ts`) || entry.endsWith(`.test.tsx`)).sort();
+    const entries = braceMatch[1].split(`,`).map((entry) => `src/${entry}`);
+    const quarantinedFiles = entries
+      .filter((entry) => entry.endsWith(`.test.ts`) || entry.endsWith(`.test.tsx`))
+      .sort();
 
     expect(quarantinedFiles).toEqual(QUARANTINED);
   });
