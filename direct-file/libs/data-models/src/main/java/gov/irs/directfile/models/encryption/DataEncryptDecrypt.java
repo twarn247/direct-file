@@ -1,5 +1,6 @@
 package gov.irs.directfile.models.encryption;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -8,7 +9,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import com.amazonaws.encryptionsdk.AwsCrypto;
 import com.amazonaws.encryptionsdk.CryptoMaterialsManager;
 import com.amazonaws.encryptionsdk.CryptoResult;
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -17,7 +17,6 @@ import gov.irs.directfile.models.autoconfigure.EncryptionContextProperties;
 
 @Component
 @Slf4j
-@SuppressFBWarnings(value = "DM_DEFAULT_ENCODING", justification = "Initial Spotbugs Setup")
 @SuppressWarnings("PMD.UnusedPrivateMethod")
 public class DataEncryptDecrypt {
     /** Stable log marker. The Phase C gate is a log query for this string returning zero. */
@@ -154,7 +153,7 @@ public class DataEncryptDecrypt {
 
     @PostConstruct
     private void checkKmsConnection() {
-        byte[] testBytes = "something".getBytes();
+        byte[] testBytes = "something".getBytes(StandardCharsets.UTF_8);
         try {
             awsCrypto.encryptData(cryptoMaterialsManager, testBytes);
             log.info("encryption setup health check passed");

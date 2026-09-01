@@ -215,12 +215,34 @@ scoped to `df-client-app` alone silently skips them. The remaining steps stay sc
 `df-client-app`, since once dependencies are installed at the workspace root, ancestor
 `node_modules/.bin` resolution finds them correctly from there.
 
-The `Test` step (`npm run test:ci`) currently fails on a pre-existing backlog unrelated
-to anything in CI itself: 21 test failures across `hsa.test.ts` (HSA contribution-limit
-calculations), `apiHelpers.test.ts`, and a `flowSnapshots.test.ts` snapshot mismatch —
-confirmed present on a clean checkout before this CI job existed. These are left
-unresolved deliberately; see the handback in
-`docs/superpowers/plans/2026-08-31-client-hardening-and-ci.md`.
+The `Test` step (`npm run test:ci`) quarantines three known-failing files via `--exclude`
+so the `client` job can go green and eventually become a required status check. A guard
+test (`src/test/quarantineList.test.ts`) parses the `test:ci` script and fails if this
+table drifts from what's actually excluded.
+
+Quarantining a file has no expiry by default — nothing would otherwise notice if one of
+these started passing again. The `Quarantined tests still fail` CI step
+(`npm run test:ci:quarantine-watch`) runs exactly these three files and inverts the exit
+code: it stays green while they're still failing (the expected state) and goes red the
+moment any of them starts passing, which is the signal to remove that file from both the
+`test:ci` exclude glob and this table. The same guard test checks that this step's file
+list matches the table too.
+
+| File | Failure |
+| --- | --- |
+| `src/test/factDictionaryTests/hsa.test.ts` | 19 assertions on HSA contribution-limit dollar amounts |
+| `src/misc/apiHelpers.test.ts` | expects `SM_UNIVERSALID` overridden from `localStorage.preauthUuid`, gets the nil UUID |
+| `src/test/scenarioTests/flowSnapshots.test.ts` | snapshot mismatch — `ENOENT` on a fact-dictionary fixture the public release appears to have stripped |
+
+Baseline run confirming these three files and no others fail:
+https://github.com/twarn247/direct-file/pull/6#issuecomment-5494900442
+
+**The `hsa.test.ts` failures are not cosmetic.** Wrong dollar amounts in
+contribution-limit logic mean either the fact dictionary or the test expectations are
+wrong, and one of those is a tax-calculation defect. Excluding the file is a decision
+about CI signal, not a judgement that the failures are harmless. It needs review by
+someone with tax-domain knowledge. See the handback in
+`docs/superpowers/plans/2026-09-01-backend-lows-and-ci-gating.md`.
 
 ### Reproducing a CI failure locally
 

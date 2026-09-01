@@ -469,14 +469,19 @@ direct-file:
   data-import-gating:
     allowlist:
       enabled: false
-      hex-key:
+      # No committed default. Set DF_DATA_IMPORT_GATING_ALLOWLIST_HEX_KEY (>= 32 bytes,
+      # hex-encoded) when enabling. DataImportGatingEmailAllowlistService refuses to start
+      # without it -- a blank or malformed value used to decode to a silent zero-length key.
+      hex-key: ${DF_DATA_IMPORT_GATING_ALLOWLIST_HEX_KEY:}
       object-key: "data-import-allowlist-export.csv"
   data-import:
     enabled: true
   feature-flags:
     allowlist:
       enabled: false
-      hex-key: "key"
+      # No committed default. Set DF_FEATURE_FLAGS_ALLOWLIST_HEX_KEY (>= 32 bytes, hex-encoded)
+      # when enabling. EmailAllowlistFeatureService refuses to start without it.
+      hex-key: ${DF_FEATURE_FLAGS_ALLOWLIST_HEX_KEY:}
       object-key: "allowlist-export.csv"
     open-enrollment:
       enabled: true
