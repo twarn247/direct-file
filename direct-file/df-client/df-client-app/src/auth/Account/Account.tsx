@@ -10,7 +10,6 @@ import {
   Icon,
   Link,
 } from '@trussworks/react-uswds';
-import { clearBrowserStorage } from '../storage.js';
 import PageTitle from '../../components/PageTitle/index.js';
 import useTranslatePIIRedacted from '../../hooks/useTranslatePIIRedacted.js';
 import { useContext, useMemo } from 'react';

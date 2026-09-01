@@ -1,4 +1,3 @@
-
 export const clearBrowserStorage = () => {
   // Local storage is a per-origin data cache in the user's browser.
   localStorage.clear();

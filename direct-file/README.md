@@ -205,6 +205,23 @@ multiple SARIF runs uploaded under a shared category, so each module gets its ow
 upload step. **It is currently reporting-only and does not fail the build** — see the
 handback in `docs/superpowers/plans/2026-08-29-ci-pipeline-and-dependency-scanning.md`.
 
+**`client`** runs `npm run lint` (ESLint and Stylelint, both at `--max-warnings=0`, with
+`tsc --build` via `prelint:ts`) and all three vitest suites for `df-client-app`. It does
+not depend on the Java jobs — the client's `generate-fact-dictionary` step is plain
+`vite-node` and needs no JVM. `npm ci` runs from the npm workspace root
+(`direct-file/df-client/`), not from `df-client-app/` itself: some tools (Stylelint
+among them) are devDependencies declared only at the workspace root, and installing
+scoped to `df-client-app` alone silently skips them. The remaining steps stay scoped to
+`df-client-app`, since once dependencies are installed at the workspace root, ancestor
+`node_modules/.bin` resolution finds them correctly from there.
+
+The `Test` step (`npm run test:ci`) currently fails on a pre-existing backlog unrelated
+to anything in CI itself: 21 test failures across `hsa.test.ts` (HSA contribution-limit
+calculations), `apiHelpers.test.ts`, and a `flowSnapshots.test.ts` snapshot mismatch —
+confirmed present on a clean checkout before this CI job existed. These are left
+unresolved deliberately; see the handback in
+`docs/superpowers/plans/2026-08-31-client-hardening-and-ci.md`.
+
 ### Reproducing a CI failure locally
 
 ```sh
@@ -213,6 +230,13 @@ cd ../libs && ./mvnw clean install
 cd ../backend && ./mvnw verify     # or state-api / email-service
 ```
 
-Not the React client, the fact-graph's own test suite, or `status`/`submit` — none of
-the three is in CI yet, `status`/`submit` because they cannot compile in this
-environment (see above), the others as documented follow-ups.
+For the client:
+
+```sh
+cd direct-file/df-client && npm ci
+cd df-client-app && npm run lint && npm run test:ci && npm run test:ci:2 && npm run test:ci:3
+```
+
+Not the fact-graph's own test suite or `status`/`submit` — `status`/`submit` because
+they cannot compile in this environment (see above), the fact-graph as a documented
+follow-up.

@@ -3,7 +3,6 @@ import { Provider } from 'react-redux';
 import StateTaxesCard, { StateTaxesCardProps } from './StateTaxesCard.js';
 import { CURRENT_TAX_YEAR } from '../../constants/taxConstants.js';
 import { StateProfile } from '../../types/StateProfile.js';
-import { ENVIRONMENT_CONFIGS } from '../../constants/pageConstants.js';
 import { FactGraphContextProvider } from '../../factgraph/FactGraphContext.js';
 import { TaxReturnsContext } from '../../context/TaxReturnsContext.js';
 import { wrapComponent } from '../../test/helpers.js';

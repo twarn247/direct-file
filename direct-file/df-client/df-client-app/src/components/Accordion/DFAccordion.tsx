@@ -3,7 +3,6 @@ import { CommonAccordion, CommonAccordionProps } from '@irs/df-common';
 import { CommonTranslation } from 'df-i18n';
 import Translation from '../Translation/index.js';
 import { useMemo } from 'react';
-import { isBeforeResubmissionDeadline } from '../../utils/dateUtils.js';
 import InternalLink from '../InternalLink/index.js';
 
 const DFAccordion = ({
@@ -18,8 +17,6 @@ const DFAccordion = ({
   const innerAdditionalComponents = useMemo(() => {
     // Make sure the customersupportLink is available, if needed
     // CommonAccordion doesn't delegate to ContentDisplay
-    const now = new Date();
-
     const innerAdditionalComponents: typeof additionalComponents = {
       ...additionalComponents,
     };

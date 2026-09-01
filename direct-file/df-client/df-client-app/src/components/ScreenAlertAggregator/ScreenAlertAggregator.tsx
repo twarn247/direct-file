@@ -1,5 +1,5 @@
 import SummaryErrorAlert from '../SummaryAlert/index.js';
-import { MutableRefObject, useEffect } from 'react';
+import { MutableRefObject } from 'react';
 import { ConcretePath } from '@irs/js-factgraph-scala';
 import { AggregatedAlertConfig } from '../../flow/ContentDeclarations.js';
 import MefAlert from '../Alert/MefAlert.js';
@@ -8,7 +8,6 @@ import { useSystemAlertContext } from '../../context/SystemAlertContext/SystemAl
 import SystemAlertAggregator from '../SystemAlertAggregator/SystemAlertAggregator.js';
 import { ScreenInfo, buildRenderedScreenContentKey, conditionsAsKeySuffix } from '../screenUtils.js';
 import { RenderedScreenContent } from '../RenderedScreenContent.js';
-import { useTranslation } from 'react-i18next';
 import { assertNever } from 'assert-never';
 
 export const ERROR_SUMMARY_ID = `error-summary`;
@@ -67,9 +66,10 @@ const ScreenAlertAggregator = ({
   taxReturnAlerts,
   showSummary,
   screenInfo,
+  // Part of the documented prop contract (see the type above); not yet read in this component's own logic.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   showFeedback,
 }: ScreenAlertAggregatorProps) => {
-  const { t, i18n } = useTranslation(`translation`);
   const { systemAlerts } = useSystemAlertContext();
 
   const { errors: mefErrors, warnings: mefWarnings } = parseAlertsByType(mefAlerts);

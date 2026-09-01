@@ -8,7 +8,6 @@ import { getCurrentTaxYearReturn } from '../../../utils/taxReturnUtils.js';
 import type { WritableDraft } from 'immer';
 import { AppDispatch, RootState } from '../../store.js';
 import { taxReturnCreate } from './taxReturnCreate.js';
-import { maybeGetTaxReturnFromUnknown } from '../../../context/TaxReturnSchema.js';
 import { fetchProfile } from '../data-import/dataImportProfileSlice.js';
 export const TAX_ID_STORAGE_KEY = `taxId`;
 
@@ -191,11 +190,6 @@ function extractTaxReturnValuesFromAPIResponse(taxReturns: TaxReturn[]): {
   taxReturns: TaxReturn[];
   currentTaxReturn: TaxReturn | undefined;
 } {
-  taxReturns.forEach((tx) => {
-    if (maybeGetTaxReturnFromUnknown(tx) === null) {
-    }
-  });
-
   const currentTaxReturn = getCurrentTaxYearReturn(taxReturns);
   return {
     taxReturns,

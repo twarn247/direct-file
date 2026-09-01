@@ -494,9 +494,8 @@ export const saveImportedFacts = (
     if (fact.props.importedPath) {
       const targetPath = Path.concretePath(fact.props.path, collectionId);
       const importedTargetPath = Path.concretePath(fact.props.importedPath, collectionId);
-      // @ts-ignore
       const dataImportGetter = DataImportFactMap.get(fact.props.importedPath as AbsolutePath);
-      // @ts-ignore
+      // @ts-expect-error -- DataImportFactMap.get()'s return type doesn't reflect that it's callable here
       const sourceValue = dataImportGetter(profile, collectionId);
       const targetFactValue = factGraph.get(targetPath);
       const importedFactValue = factGraph.get(importedTargetPath);

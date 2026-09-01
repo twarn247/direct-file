@@ -20,7 +20,6 @@ type HeaderProps = {
 const Header = ({ switchLang, autoSpanishModal: showSpanishModal }: HeaderProps) => {
   const location = useLocation();
   const { t, i18n } = useTranslation(`translation`);
-  const now = new Date();
 
   const modalRef = useRef<ModalRef>(null);
 

@@ -1,8 +1,7 @@
-import { createSlice, createAsyncThunk, PayloadAction, ThunkAction, UnknownAction } from '@reduxjs/toolkit';
-import type { AnyCodedExceptionConfig, CodedException, CodedExceptionConfig } from './codedException.js';
+import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
+import type { AnyCodedExceptionConfig } from './codedException.js';
 import { v4 as uuidv4 } from 'uuid';
 import type { RootState } from '../../store.js';
-import { isTelemetryEnabled } from '../../../constants/pageConstants.js';
 import { StoredLoggedError } from './types.js';
 import { processError } from './processError.js';
 

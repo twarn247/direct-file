@@ -8,7 +8,6 @@ import { FEDERAL_RETURN_STATUS } from '../constants/taxConstants.js';
 import { useFlow } from '../flow/flowConfig.js';
 import { CompleteFactGraphResult } from '@irs/js-factgraph-scala/src/typings/FactGraph.js';
 import { TaxReturnsContext } from '../context/TaxReturnsContext.js';
-import { is1099RFeatureFlagEnabled } from '../constants/pageConstants.js';
 import { useAppDispatch } from '../redux/hooks.js';
 import { resetElectronicSignatureFailure } from '../redux/slices/electronic-signature/electronicSignatureSlice.js';
 
@@ -87,7 +86,7 @@ export const FactGraphContextProvider = ({
       });
     };
 
-    if (process.env.NODE_ENV == `development`) {
+    if (process.env.NODE_ENV === `development`) {
       // If we're in dev mode and on the checklist, we can load a fact graph from a json string.
       // This operates by sending the fact graph to the backend, and then reloading the page to remove any local state.
       globalThis.saveFactGraphToLocalStorageKey = (keyId: string, force?: boolean) => {
@@ -120,4 +119,3 @@ export const FactGraphContextProvider = ({
 export const useFactGraph = () => {
   return useContext(FactGraphContext);
 };
-

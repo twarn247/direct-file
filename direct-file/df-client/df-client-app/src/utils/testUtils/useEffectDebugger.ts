@@ -66,6 +66,11 @@ export const useEffectDebugger = (effectHook: EffectCallback, dependencies: Depe
     return accum;
   }, {});
 
+  if (Object.keys(changedDeps).length) {
+    // eslint-disable-next-line no-console -- this is the entire point of a dependency-change debugging utility
+    console.log(`[useEffectDebugger]`, changedDeps);
+  }
+
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(effectHook, dependencies);
 };
