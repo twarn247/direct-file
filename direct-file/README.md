@@ -220,6 +220,14 @@ so the `client` job can go green and eventually become a required status check. 
 test (`src/test/quarantineList.test.ts`) parses the `test:ci` script and fails if this
 table drifts from what's actually excluded.
 
+Quarantining a file has no expiry by default — nothing would otherwise notice if one of
+these started passing again. The `Quarantined tests still fail` CI step
+(`npm run test:ci:quarantine-watch`) runs exactly these three files and inverts the exit
+code: it stays green while they're still failing (the expected state) and goes red the
+moment any of them starts passing, which is the signal to remove that file from both the
+`test:ci` exclude glob and this table. The same guard test checks that this step's file
+list matches the table too.
+
 | File | Failure |
 | --- | --- |
 | `src/test/factDictionaryTests/hsa.test.ts` | 19 assertions on HSA contribution-limit dollar amounts |

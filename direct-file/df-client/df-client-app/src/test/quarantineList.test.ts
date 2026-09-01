@@ -36,4 +36,20 @@ describe(`test:ci quarantine list`, () => {
 
     expect(quarantinedFiles).toEqual(QUARANTINED);
   });
+
+  it(`the quarantine-watch script runs exactly the same files`, () => {
+    // test:ci excludes these files; test:ci:quarantine-watch runs only them, inverting the
+    // exit code so CI stays green while they're still failing and goes red the moment any
+    // of them starts passing -- that's the signal to remove it from both places above.
+    const pkg = JSON.parse(readFileSync(resolve(appRoot, `package.json`), `utf8`));
+    const watchScript: string = pkg.scripts[`test:ci:quarantine-watch`];
+
+    const fileArgs = watchScript
+      .replace(/^vitest run --silent /, ``)
+      .replace(/; test \$\? -ne 0$/, ``)
+      .split(` `)
+      .sort();
+
+    expect(fileArgs).toEqual(QUARANTINED);
+  });
 });

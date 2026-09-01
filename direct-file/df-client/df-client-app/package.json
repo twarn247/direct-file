@@ -69,6 +69,7 @@
     "test:ci:2": "vitest --run --silent src/test/completenessTests/* src/test/functionalFlowTests/*",
     "test:ci:3": "vitest --run --silent src/all-screens/*",
     "test:ci": "VITEST_MAX_THREADS=4 VITEST_MIN_THREADS=4 vitest --exclude 'src/{test/completenessTests/*,test/functionalFlowTests/*,all-screens/*,misc/apiHelpers.test.ts,test/factDictionaryTests/hsa.test.ts,test/scenarioTests/flowSnapshots.test.ts}' --run --silent",
+    "test:ci:quarantine-watch": "vitest run --silent src/misc/apiHelpers.test.ts src/test/factDictionaryTests/hsa.test.ts src/test/scenarioTests/flowSnapshots.test.ts; test $? -ne 0",
     "test:ui": "vitest --ui",
     "test": "vitest",
     "tsc:watch": "tsc --watch",
