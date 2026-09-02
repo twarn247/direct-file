@@ -318,10 +318,9 @@ jobs:
       # Three suites because the repository splits them that way: test:ci excludes the
       # completeness, functional-flow, and all-screens directories, which :2 and :3 cover.
       # if: always() on the latter two is load-bearing, not decorative: GitHub Actions
-      # halts a job at the first failed step by default. test:ci also excludes three
-      # individually-quarantined files (see README) -- without if: always(), a step
-      # failure anywhere upstream would silently skip :2 and :3 entirely. Confirmed via
-      # a real CI run that this was already happening before if: always() was added.
+      # halts a job at the first failed step by default, so without if: always() a Test
+      # failure would silently skip :2 and :3 entirely. Confirmed via a real CI run that
+      # this was already happening before if: always() was added.
       - name: Test
         run: npm run test:ci
 

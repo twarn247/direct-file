@@ -224,7 +224,7 @@ diagnosed; all three are resolved and the quarantine machinery has been removed.
 `apiHelpers.test.ts` asserted a `localStorage` auth-header override whose implementation was
 stripped for the public release, and was deleted rather than reinstated. `flowSnapshots.test.ts`
 aborted on a dangling `backend-scenarios-ero` symlink and now skips that folder when its target
-is absent, which recovered 163 scenarios that were not running at all.
+is absent, which recovered 161 scenarios that were not running at all.
 
 ### Reproducing a CI failure locally
 
