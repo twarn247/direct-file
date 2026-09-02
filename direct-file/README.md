@@ -234,7 +234,16 @@ list matches the table too.
 | `src/test/scenarioTests/flowSnapshots.test.ts` | suite fails to load: `ENOENT` on `src/test/factDictionaryTests/backend-scenarios-ero` |
 
 Baseline run confirming these two files and no others fail (after hsa.test.ts was fixed):
-To be confirmed in the pull request.
+https://github.com/twarn247/direct-file/pull/9
+
+**Previously quarantined:** `src/test/factDictionaryTests/hsa.test.ts` was excluded here and
+described as a tax-calculation defect. It was not. The MFJ test block derived dates of birth
+from `new Date()`, while `/filers/*/age55OrOlder` measures age at the end of the tax year —
+fixed at 2024 — so every age drifted down by one per calendar year until the "over 55" cases
+evaluated as under 55 and the form 8889 catch-up amounts went to zero. The fact dictionary was
+correct throughout. Fixed by anchoring the fixtures to `CURRENT_TAX_YEAR` via
+`dateOfBirthForAgeAtEndOfTaxYear` in `src/test/testData.ts`; use that helper for any fixture
+whose age matters, and never build one from the wall clock.
 
 ### Reproducing a CI failure locally
 
