@@ -16,7 +16,17 @@ public class ClientIpResolverTest {
     private static final String INTERNAL_CIDR = "10.0.0.0/8";
 
     private static ClientIpResolver resolver(String... trustedProxies) {
-        return new ClientIpResolver(new ClientIpConfigurationProperties(List.of(trustedProxies)));
+        return resolver(false, trustedProxies);
+    }
+
+    // True-Client-IP has no append structure like X-Forwarded-For, so trusting it is a separate,
+    // explicit assertion -- see ClientIpConfigurationProperties. Named for the tests that need it.
+    private static ClientIpResolver resolverTrustingTrueClientIp(String... trustedProxies) {
+        return resolver(true, trustedProxies);
+    }
+
+    private static ClientIpResolver resolver(boolean trustTrueClientIp, String... trustedProxies) {
+        return new ClientIpResolver(new ClientIpConfigurationProperties(List.of(trustedProxies), trustTrueClientIp));
     }
 
     private static HttpServletRequest request(String peer, String trueClientIp, String forwardedFor) {
@@ -45,11 +55,35 @@ public class ClientIpResolverTest {
     }
 
     @Test
-    void whenPeerIsTrusted_prefersTrueClientIp() {
-        ClientIpResolver subject = resolver(EDGE_CIDR);
+    void whenPeerIsTrusted_andTrueClientIpIsTrusted_prefersTrueClientIp() {
+        ClientIpResolver subject = resolverTrustingTrueClientIp(EDGE_CIDR);
 
         assertThat(subject.resolve(request("203.0.113.5", "1.2.3.4", "5.6.7.8")))
                 .isEqualTo("1.2.3.4");
+    }
+
+    @Test
+    void whenTrustTrueClientIpIsFalse_ignoresItEvenFromATrustedPeer_fallsThroughToForwardedFor() {
+        // The finding this test exists to lock in. Unlike X-Forwarded-For, True-Client-IP has
+        // no append structure -- a trusted peer alone does not prove the edge stripped an
+        // inbound, client-supplied copy of this header before setting its own. Without an
+        // explicit trustTrueClientIp opt-in, the header must never be read at all.
+        ClientIpResolver subject = resolver(EDGE_CIDR, INTERNAL_CIDR);
+
+        assertThat(subject.resolve(request("203.0.113.5", "1.2.3.4", "198.51.100.7, 10.1.1.1")))
+                .isEqualTo("198.51.100.7");
+    }
+
+    @Test
+    void whenTrustTrueClientIpIsFalse_andNoForwardedForEither_returnsPeerNotTheSpoofedHeader() {
+        // The exact attack this default closes: an edge that does not strip inbound
+        // True-Client-IP would otherwise let an attacker set it directly and have it trusted
+        // verbatim -- worse than X-Forwarded-For handling, since it's checked first and wins
+        // outright. With no X-Forwarded-For to fall through to either, the correct outcome is
+        // the peer address, not the attacker-supplied header.
+        ClientIpResolver subject = resolver(EDGE_CIDR);
+
+        assertThat(subject.resolve(request("203.0.113.5", "1.2.3.4", null))).isEqualTo("203.0.113.5");
     }
 
     @Test
@@ -92,9 +126,10 @@ public class ClientIpResolverTest {
 
     @Test
     void aHostnameInAHeaderIsNeverResolved() {
-        // IpAddressMatcher.matches() would DNS-resolve this on Spring Security 6.3.
-        // The literal guard must reject it before it reaches the matcher.
-        ClientIpResolver subject = resolver(EDGE_CIDR);
+        // IpAddressMatcher.matches() would DNS-resolve this on Spring Security 6.3. Trusting
+        // True-Client-IP explicitly so this test actually exercises the literal guard on the
+        // header path, rather than passing because the header was never read at all.
+        ClientIpResolver subject = resolverTrustingTrueClientIp(EDGE_CIDR);
 
         assertThat(subject.resolve(request("203.0.113.5", "attacker.example.com", null)))
                 .isEqualTo("203.0.113.5");
@@ -109,7 +144,7 @@ public class ClientIpResolverTest {
 
     @Test
     void supportsIpv6TrustedProxies() {
-        ClientIpResolver subject = resolver("2001:db8::/32");
+        ClientIpResolver subject = resolverTrustingTrueClientIp("2001:db8::/32");
 
         assertThat(subject.resolve(request("2001:db8::1", "198.51.100.7", null)))
                 .isEqualTo("198.51.100.7");
@@ -117,7 +152,7 @@ public class ClientIpResolverTest {
 
     @Test
     void aBareAddressIsAValidTrustedProxyEntry() {
-        ClientIpResolver subject = resolver("203.0.113.5");
+        ClientIpResolver subject = resolverTrustingTrueClientIp("203.0.113.5");
 
         assertThat(subject.resolve(request("203.0.113.5", "198.51.100.7", null)))
                 .isEqualTo("198.51.100.7");

@@ -12,12 +12,20 @@ import org.springframework.stereotype.Component;
 /**
  * Resolves the client address for a request, trusting X-Forwarded-For and True-Client-IP only
  * when the request's immediate peer is a configured trusted proxy.
+ *
+ * <p>True-Client-IP is additionally gated by trustTrueClientIp, off by default. Unlike
+ * X-Forwarded-For -- append-only, so a client-injected prefix is superseded by real hops to its
+ * right -- True-Client-IP is a single value with no accumulation. A trusted peer alone does not
+ * establish that the peer stripped an inbound, client-supplied copy of the header before setting
+ * its own; that is a separate assertion an operator makes explicitly. See {@link
+ * ClientIpConfigurationProperties}.
  */
 @Slf4j
 @Component
 public class ClientIpResolver {
 
     private final List<IpAddressMatcher> trustedProxies;
+    private final boolean trustTrueClientIp;
 
     public ClientIpResolver(ClientIpConfigurationProperties properties) {
         this.trustedProxies = properties.getTrustedProxies().stream()
@@ -25,6 +33,7 @@ public class ClientIpResolver {
                 .filter(StringUtils::isNotBlank)
                 .map(ClientIpResolver::matcherFor)
                 .toList();
+        this.trustTrueClientIp = properties.isTrustTrueClientIp();
         if (this.trustedProxies.isEmpty()) {
             log.warn("direct-file.client-ip.trusted-proxies is empty. X-Forwarded-For and True-Client-IP"
                     + " will be ignored and the direct peer address used instead.");
@@ -39,9 +48,11 @@ public class ClientIpResolver {
             return peer;
         }
 
-        String trueClientIp = request.getHeader(RequestHeaderNames.TRUE_CLIENT_IP);
-        if (isIpLiteral(trueClientIp)) {
-            return trueClientIp.strip();
+        if (trustTrueClientIp) {
+            String trueClientIp = request.getHeader(RequestHeaderNames.TRUE_CLIENT_IP);
+            if (isIpLiteral(trueClientIp)) {
+                return trueClientIp.strip();
+            }
         }
 
         String forwardedFor = request.getHeader(RequestHeaderNames.X_FORWARDED_FOR);
