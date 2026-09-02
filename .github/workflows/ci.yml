@@ -332,12 +332,3 @@ jobs:
       - name: Test (all screens)
         if: always()
         run: npm run test:ci:3
-
-      # The three files test:ci excludes are individually quarantined, not deleted --
-      # this step runs exactly those files and inverts the exit code, so it fails the
-      # moment any of them starts passing again. That's the signal a human needs to see
-      # to remove it from test:ci's --exclude glob and the README table. Without this,
-      # nothing would ever notice a quarantined file silently becoming safe to re-enable.
-      - name: Quarantined tests still fail (remove from quarantine if this goes red)
-        if: always()
-        run: npm run test:ci:quarantine-watch
