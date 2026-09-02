@@ -1,5 +1,4 @@
 import { formatAndAppendHeaders, SM_UNIVERSALID, XFF_HEADER, TID_HEADER } from './apiHelpers.js';
-import { v4 as uuidv4 } from 'uuid';
 
 const {
   VITE_SADI_AUTH_ID,
@@ -48,19 +47,6 @@ describe(`apiHelpers`, () => {
     // then:
     expect(headers).toHaveProperty(`Content-Type`, `application/json`);
     expect(headers).toHaveProperty(SM_UNIVERSALID, VITE_SADI_AUTH_ID);
-  });
-
-  it(`Overrides the ${SM_UNIVERSALID} from localstorage when preauthUuid is set`, () => {
-    // given:
-    const preauthUuid = uuidv4();
-    localStorage.setItem(`preauthUuid`, preauthUuid);
-
-    // when:
-    const headers = formatAndAppendHeaders({});
-
-    // then:
-    expect(headers).toHaveProperty(`Content-Type`, `application/json`);
-    expect(headers).toHaveProperty(SM_UNIVERSALID, preauthUuid);
   });
 
   it(`adds the VITE_VITE_SADI_XFF_HEADER as ${XFF_HEADER}`, () => {

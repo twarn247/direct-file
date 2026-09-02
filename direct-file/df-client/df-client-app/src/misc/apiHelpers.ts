@@ -37,8 +37,6 @@ export function isReadError(error: unknown): error is ReadError {
   return error instanceof ReadError;
 }
 
-export const PREAUTH_UUID = `preauthUuid`;
-
 export const formatAndAppendHeaders = (headers: { [p: string]: string }) => {
   const requestHeaders: { [p: string]: string } = {};
 
