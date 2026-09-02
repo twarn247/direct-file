@@ -215,35 +215,16 @@ scoped to `df-client-app` alone silently skips them. The remaining steps stay sc
 `df-client-app`, since once dependencies are installed at the workspace root, ancestor
 `node_modules/.bin` resolution finds them correctly from there.
 
-The `Test` step (`npm run test:ci`) quarantines two known-failing files via `--exclude`
-so the `client` job can go green and eventually become a required status check. A guard
-test (`src/test/quarantineList.test.ts`) parses the `test:ci` script and fails if this
-table drifts from what's actually excluded.
+The `Test` step runs the full `df-client-app` suite with no exclusions beyond the three
+directory globs that split it from `test:ci:2` and `test:ci:3`.
 
-Quarantining a file has no expiry by default — nothing would otherwise notice if one of
-these started passing again. The `Quarantined tests still fail` CI step
-(`npm run test:ci:quarantine-watch`) runs exactly these two files and inverts the exit
-code: it stays green while they're still failing (the expected state) and goes red the
-moment any of them starts passing, which is the signal to remove that file from both the
-`test:ci` exclude glob and this table. The same guard test checks that this step's file
-list matches the table too.
-
-| File | Failure |
-| --- | --- |
-| `src/misc/apiHelpers.test.ts` | `SM_UNIVERSALID` not overridden from `localStorage` when `preauthUuid` is set |
-| `src/test/scenarioTests/flowSnapshots.test.ts` | suite fails to load: `ENOENT` on `src/test/factDictionaryTests/backend-scenarios-ero` |
-
-Baseline run confirming these two files and no others fail (after hsa.test.ts was fixed):
-https://github.com/twarn247/direct-file/pull/9
-
-**Previously quarantined:** `src/test/factDictionaryTests/hsa.test.ts` was excluded here and
-described as a tax-calculation defect. It was not. The MFJ test block derived dates of birth
-from `new Date()`, while `/filers/*/age55OrOlder` measures age at the end of the tax year —
-fixed at 2024 — so every age drifted down by one per calendar year until the "over 55" cases
-evaluated as under 55 and the form 8889 catch-up amounts went to zero. The fact dictionary was
-correct throughout. Fixed by anchoring the fixtures to `CURRENT_TAX_YEAR` via
-`dateOfBirthForAgeAtEndOfTaxYear` in `src/test/testData.ts`; use that helper for any fixture
-whose age matters, and never build one from the wall clock.
+Three files were quarantined here between 2026-08-31 and 2026-09-02 while their failures were
+diagnosed; all three are resolved and the quarantine machinery has been removed.
+`hsa.test.ts` was a test fixture deriving ages from the wall clock rather than the tax year.
+`apiHelpers.test.ts` asserted a `localStorage` auth-header override whose implementation was
+stripped for the public release, and was deleted rather than reinstated. `flowSnapshots.test.ts`
+aborted on a dangling `backend-scenarios-ero` symlink and now skips that folder when its target
+is absent, which recovered 161 scenarios that were not running at all.
 
 ### Reproducing a CI failure locally
 

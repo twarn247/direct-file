@@ -51,10 +51,24 @@ describe(`Flow snapshot tests`, () => {
   const SCENARIO_FOLDER = `./src/test/factDictionaryTests/backend-scenarios`;
   const ERO_SCENARIO_FOLDER = `./src/test/factDictionaryTests/backend-scenarios-ero`;
   const FLOW_SNAPSHOTS_FOLDER = `./src/test/scenarioTests/flow-snapshots`;
-  const files = fs.readdirSync(SCENARIO_FOLDER);
-  const eroFiles = fs.readdirSync(ERO_SCENARIO_FOLDER);
-  const jsons = files.filter((f) => f.endsWith(`.json`) && !f.endsWith(`.expected.json`));
-  const eroJsons = eroFiles.filter((f) => f.endsWith(`.json`) && !f.endsWith(`.expected.json`));
+  const isScenarioJson = (f: string) => f.endsWith(`.json`) && !f.endsWith(`.expected.json`);
+
+  const jsons = fs.readdirSync(SCENARIO_FOLDER).filter(isScenarioJson);
+
+  // backend-scenarios-ero is a git-tracked symlink to backend/src/test/resources/scenarios-ero,
+  // which is not present in this public checkout, so the link dangles. existsSync follows
+  // symlinks, so this is false exactly when the target is missing. Reading it unguarded threw
+  // ENOENT during collection and took the whole suite down with it -- including the 163 non-ERO
+  // scenarios that ARE present. The ero-*.csv expected outputs did ship, so if the fixtures
+  // ever land these scenarios start running again with no change here.
+  const eroScenariosAvailable = fs.existsSync(ERO_SCENARIO_FOLDER);
+  const eroJsons = eroScenariosAvailable ? fs.readdirSync(ERO_SCENARIO_FOLDER).filter(isScenarioJson) : [];
+  if (!eroScenariosAvailable) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      `Skipping ERO flow snapshots: ${ERO_SCENARIO_FOLDER} is a dangling symlink (target not in this checkout).`
+    );
+  }
 
   const scenarioFolders = [
     { folder: SCENARIO_FOLDER, scenarioJsons: jsons },
@@ -81,6 +95,11 @@ describe(`Flow snapshot tests`, () => {
         expect(screensMatchSnapshot).toBe(true);
       });
     });
+  });
+
+  it(`found scenarios to snapshot`, () => {
+    // Guards the skip above: a suite that silently runs zero scenarios must not read as green.
+    expect(jsons.length).toBeGreaterThan(0);
   });
 });
 

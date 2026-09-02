@@ -318,10 +318,9 @@ jobs:
       # Three suites because the repository splits them that way: test:ci excludes the
       # completeness, functional-flow, and all-screens directories, which :2 and :3 cover.
       # if: always() on the latter two is load-bearing, not decorative: GitHub Actions
-      # halts a job at the first failed step by default. test:ci also excludes three
-      # individually-quarantined files (see README) -- without if: always(), a step
-      # failure anywhere upstream would silently skip :2 and :3 entirely. Confirmed via
-      # a real CI run that this was already happening before if: always() was added.
+      # halts a job at the first failed step by default, so without if: always() a Test
+      # failure would silently skip :2 and :3 entirely. Confirmed via a real CI run that
+      # this was already happening before if: always() was added.
       - name: Test
         run: npm run test:ci
 
@@ -332,12 +331,3 @@ jobs:
       - name: Test (all screens)
         if: always()
         run: npm run test:ci:3
-
-      # The three files test:ci excludes are individually quarantined, not deleted --
-      # this step runs exactly those files and inverts the exit code, so it fails the
-      # moment any of them starts passing again. That's the signal a human needs to see
-      # to remove it from test:ci's --exclude glob and the README table. Without this,
-      # nothing would ever notice a quarantined file silently becoming safe to re-enable.
-      - name: Quarantined tests still fail (remove from quarantine if this goes red)
-        if: always()
-        run: npm run test:ci:quarantine-watch

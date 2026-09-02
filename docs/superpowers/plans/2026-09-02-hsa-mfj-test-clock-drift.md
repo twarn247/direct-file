@@ -389,6 +389,8 @@ time. A correction is posted on the PR #6 thread."
 
 4. **`enforce_admins` is off on `main`'s branch protection**, which was applied outside a plan after being carried unexecuted through two of them. Revisit if the repository gains a second maintainer.
 
+   **Correction (2026-09-02, `docs/superpowers/plans/2026-09-02-clear-the-test-quarantine.md`):** the claim above is wrong. Branch protection was never applied — `gh api repos/twarn247/direct-file/branches/main/protection` returns `404 Branch not protected`, confirmed independently at three separate points since this handback was written. It has now been carried unexecuted through three plans, not applied after two. Left uncorrected above as a record of what this plan believed at the time; do not rely on it.
+
 5. **The security review is still not on `main`.** It lives only on `origin/claude/report-security-review-lb7lsz` (commit `a6777fe`). Five plans cite that path as their spec and it resolves for none of them.
 
 6. **The original review's register is fully closed.** H-1, M-1 through M-5, and L-1 through L-8 are all addressed. A fresh review against the current tree — rather than the 2025-06-05 snapshot the original covered — is the natural next substantial piece of work.
