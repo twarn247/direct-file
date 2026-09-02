@@ -3,12 +3,8 @@ import { resolve } from 'path';
 
 const appRoot = resolve(__dirname, `../..`);
 
-// Keep in sync with the README's CI quarantine table -- both describe the same three files.
-const QUARANTINED = [
-  `src/misc/apiHelpers.test.ts`,
-  `src/test/factDictionaryTests/hsa.test.ts`,
-  `src/test/scenarioTests/flowSnapshots.test.ts`,
-].sort();
+// Keep in sync with the README's CI quarantine table -- both describe the same two files.
+const QUARANTINED = [`src/misc/apiHelpers.test.ts`, `src/test/scenarioTests/flowSnapshots.test.ts`].sort();
 
 describe(`test:ci quarantine list`, () => {
   it(`excludes exactly the documented known-failing files`, () => {

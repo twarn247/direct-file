@@ -28,6 +28,7 @@ import {
   basePrimaryFilerHSAFactsWithoutContributionAmounts,
   baseHSAFactsSkipToTestingPeriod,
   makeMultipleHsaDistributions,
+  dateOfBirthForAgeAtEndOfTaxYear,
 } from '../testData.js';
 import { describe, it, expect } from 'vitest';
 
@@ -620,17 +621,16 @@ describe(`HSA Contributions and Coverage`, () => {
 
       testCases.forEach((testCase) => {
         describe(`when ${testCase.description}`, () => {
-          // setup the test data
-          const primaryFilerDob = new Date();
-          primaryFilerDob.setFullYear(primaryFilerDob.getFullYear() - testCase.filerAge);
-          const spouseDob = new Date();
-          spouseDob.setFullYear(spouseDob.getFullYear() - testCase.spouseAge);
+          // setup the test data. Ages are measured at the end of the tax year, not today --
+          // see dateOfBirthForAgeAtEndOfTaxYear.
+          const primaryFilerDob = dateOfBirthForAgeAtEndOfTaxYear(testCase.filerAge);
+          const spouseDob = dateOfBirthForAgeAtEndOfTaxYear(testCase.spouseAge);
           const w2Id1 = `9ba9d216-81a8-4944-81ac-9410b2fad150`;
           const w2Id2 = `9ba9d216-81a8-4944-81ac-9410b2fad151`;
           const { factGraph } = setupFactGraph({
             ...mfjHsaContributionFactsWithoutContributionAmounts,
-            [`/filers/#${primaryFilerId}/dateOfBirth`]: createDayWrapper(primaryFilerDob.toISOString().split(`T`)[0]),
-            [`/filers/#${spouseId}/dateOfBirth`]: createDayWrapper(spouseDob.toISOString().split(`T`)[0]),
+            [`/filers/#${primaryFilerId}/dateOfBirth`]: createDayWrapper(primaryFilerDob),
+            [`/filers/#${spouseId}/dateOfBirth`]: createDayWrapper(spouseDob),
             ...makeMultipleW2s([
               { w2Id: w2Id1, income: 50000 },
               { w2Id: w2Id2, income: 50000 },
