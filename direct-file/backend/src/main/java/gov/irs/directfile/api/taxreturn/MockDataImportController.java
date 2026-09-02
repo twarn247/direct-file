@@ -9,6 +9,7 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.web.bind.annotation.RestController;
 
 import gov.irs.directfile.api.audit.Auditable;
+import gov.irs.directfile.api.config.ClientIpResolver;
 import gov.irs.directfile.api.dataimport.DataImportService;
 import gov.irs.directfile.api.dataimport.MockDataImportService;
 import gov.irs.directfile.api.dataimport.model.WrappedPopulatedData;
@@ -31,8 +32,9 @@ class MockDataImportController extends TaxReturnController {
             UserService userService,
             PdfService pdfService,
             EncryptionCacheWarmingService cacheWarmingService,
-            DataImportService dataImportService) {
-        super(taxReturnService, userService, pdfService, cacheWarmingService, dataImportService);
+            DataImportService dataImportService,
+            ClientIpResolver clientIpResolver) {
+        super(taxReturnService, userService, pdfService, cacheWarmingService, dataImportService, clientIpResolver);
         mockDataImportService = (MockDataImportService) dataImportService;
     }
 

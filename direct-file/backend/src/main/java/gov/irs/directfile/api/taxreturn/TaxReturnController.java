@@ -18,7 +18,7 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import gov.irs.directfile.api.audit.Auditable;
-import gov.irs.directfile.api.config.IPAddressUtil;
+import gov.irs.directfile.api.config.ClientIpResolver;
 import gov.irs.directfile.api.dataimport.DataImportService;
 import gov.irs.directfile.api.dataimport.model.WrappedPopulatedData;
 import gov.irs.directfile.api.errors.*;
@@ -43,18 +43,21 @@ public class TaxReturnController implements TaxReturnApi {
     private final PdfService pdfService;
     private final EncryptionCacheWarmingService cacheWarmingService;
     protected final DataImportService dataImportService;
+    private final ClientIpResolver clientIpResolver;
 
     public TaxReturnController(
             TaxReturnService taxReturnService,
             UserService userService,
             PdfService pdfService,
             EncryptionCacheWarmingService cacheWarmingService,
-            DataImportService dataImportService) {
+            DataImportService dataImportService,
+            ClientIpResolver clientIpResolver) {
         this.taxReturnService = taxReturnService;
         this.userService = userService;
         this.pdfService = pdfService;
         this.cacheWarmingService = cacheWarmingService;
         this.dataImportService = dataImportService;
+        this.clientIpResolver = clientIpResolver;
 
         // Context:
         // https://github.com/modelmapper/modelmapper/issues/546#issuecomment-1068925341
@@ -96,7 +99,7 @@ public class TaxReturnController implements TaxReturnApi {
 
         TaxReturn taxReturn = null;
         try {
-            String remoteIpAddress = IPAddressUtil.getClientIpAddress(request);
+            String remoteIpAddress = clientIpResolver.resolve(request);
             int remotePort = request.getRemotePort();
             final String userAgent = request.getHeader(HttpHeaders.USER_AGENT);
 
@@ -171,7 +174,7 @@ public class TaxReturnController implements TaxReturnApi {
         TaxReturn taxReturn;
 
         try {
-            String remoteAddress = IPAddressUtil.getClientIpAddress(request);
+            String remoteAddress = clientIpResolver.resolve(request);
 
             int remotePort = request.getRemotePort();
             final String userAgent = request.getHeader(HttpHeaders.USER_AGENT);
@@ -196,7 +199,7 @@ public class TaxReturnController implements TaxReturnApi {
     public ResponseEntity<String> sign(UUID id, SignRequestBody body, HttpServletRequest request) throws Exception {
         UserInfo userInfo = userService.getCurrentUserInfo();
         cacheWarmingService.warmCacheForUserExternalId(userInfo.externalId());
-        String remoteAddress = IPAddressUtil.getClientIpAddress(request);
+        String remoteAddress = clientIpResolver.resolve(request);
         int remotePort = request.getRemotePort();
         String userAgent = request.getHeader(HttpHeaders.USER_AGENT);
 

@@ -14,6 +14,7 @@ import gov.irs.directfile.api.config.*;
 @EnableScheduling
 @EnableConfigurationProperties({
     gov.irs.directfile.api.authorization.config.FeatureFlagConfigurationProperties.class,
+    ClientIpConfigurationProperties.class,
     StateApiEndpointProperties.class,
     StateApiFeatureFlagProperties.class,
     StatusEndpointProperties.class,
