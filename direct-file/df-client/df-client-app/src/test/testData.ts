@@ -2027,3 +2027,17 @@ export const makeCareProviderData = (providerId: string) => {
     },
   };
 };
+
+/**
+ * A date of birth for a filer who is exactly `age` at the END OF THE TAX YEAR, which is what
+ * /filers/*\/age and every threshold built on it (age55OrOlder, age65OrOlder) actually measure.
+ *
+ * Do not build ages from `new Date()`. The tax year is fixed while the wall clock is not, so
+ * wall-clock arithmetic silently reduces every age by one per calendar year and fixtures drift
+ * across thresholds long after they were written. That is exactly how the MFJ block of
+ * hsa.test.ts came to fail: ages written as 56 evaluated as 54 two years later.
+ *
+ * June 6 is arbitrary but safely before December 31, so the birthday has always occurred by the
+ * end of the tax year.
+ */
+export const dateOfBirthForAgeAtEndOfTaxYear = (age: number): string => `${parseInt(CURRENT_TAX_YEAR) - age}-06-06`;
