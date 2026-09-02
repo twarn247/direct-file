@@ -66,6 +66,21 @@ server:
 
 direct-file:
   api-version: v1
+  client-ip:
+    # Which upstream hops may speak for a client's address. Empty by default: with nothing
+    # configured, X-Forwarded-For and True-Client-IP are ignored and the direct peer address
+    # is used. Set DF_TRUSTED_PROXIES to a comma-separated list of the edge's CIDR blocks
+    # (for example "203.0.113.0/24,10.0.0.0/8") to turn header trust on -- list every hop, not
+    # just the edge; a load balancer or internal proxy missing from this list stops the
+    # X-Forwarded-For walk there, so every client silently resolves to that hop's own address
+    # rather than failing loudly.
+    trusted-proxies: ${DF_TRUSTED_PROXIES:}
+    # Off by default. Unlike X-Forwarded-For, True-Client-IP is a single value with no
+    # append structure, so a trusted peer alone does not prove the edge stripped an inbound,
+    # client-supplied copy of this header before setting its own -- an attacker could otherwise
+    # set True-Client-IP directly and have it trusted verbatim, bypassing every X-Forwarded-For
+    # protection above. Only set DF_TRUST_TRUE_CLIENT_IP once that stripping is confirmed.
+    trust-true-client-ip: ${DF_TRUST_TRUE_CLIENT_IP:false}
   referer-header:
     allowed-prefixes:
       - http://localhost:3000/
