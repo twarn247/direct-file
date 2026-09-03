@@ -171,6 +171,27 @@ awslocal sqs send-message --queue-url <source-queue-url> --message-body "Your me
 awslocal sqs receive-message --queue-url <source-queue-url> --message-attribute-names All
 ```
 
+## Client applications
+
+### Security headers
+
+Both client applications are served by nginx configurations checked in under
+`df-client/nginx/`, rather than embedded in their Dockerfiles. Each sends
+`Content-Security-Policy`, `X-Frame-Options: DENY`, and `X-Content-Type-Options: nosniff`,
+all with `always` so they reach error responses.
+
+The CSP is delivered **twice**: as a response header and as the `<meta http-equiv>` tag in
+each `index.html`. Both are enforcing and a browser applies their intersection, so they must
+stay identical apart from `frame-ancestors`, which meta delivery cannot express — that is the
+whole reason the header exists. `df-client-app/src/test/contentSecurityPolicy.test.ts` fails
+if they diverge, for both applications.
+
+**These are the `-local` Dockerfiles.** Production serving is not in this repository, so
+whether production sends these headers is unverified and cannot be verified from here. If the
+production edge or CDN sets its own CSP, it will intersect with the meta tag exactly as these
+do, and the two need to be reconciled deliberately rather than discovered. See finding D-4 in
+`docs/security/2026-09-02_delta-security-review.md`.
+
 ## Continuous integration
 
 `.github/workflows/ci.yml` runs on every pull request and on pushes to `main`.
