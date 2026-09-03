@@ -1,0 +1,40 @@
+# Rendered to /etc/nginx/conf.d/default.conf at container start by the official nginx
+# image's envsubst entrypoint, which substitutes DF_CLIENT_PUBLIC_PATH. nginx's own
+# runtime variables ($uri) are untouched: envsubst only replaces variables that are
+# exported in the environment.
+#
+# Extracted from Dockerfile-local, where this lived inside an escaped `RUN echo "..."`
+# shell string. The Content-Security-Policy below has double quotes, single quotes, and
+# semicolons in it; keeping it in a checked-in file is what makes it reviewable.
+server {
+    listen 3000;
+    autoindex off;
+    server_name _;
+    server_tokens off;
+    root /static;
+    gzip_static on;
+
+    # `always` on every one of these: without it nginx omits the header from error
+    # responses, so a 404 rendering the SPA shell would ship without a policy.
+    add_header X-Content-Type-Options nosniff always;
+
+    # Clickjacking protection. The <meta> CSP in index.html cannot express
+    # frame-ancestors -- it is header-only -- which is why this header exists.
+    # X-Frame-Options is redundant for browsers that honour frame-ancestors and is kept
+    # for those that do not.
+    add_header X-Frame-Options DENY always;
+
+    # Identical to the <meta http-equiv="Content-Security-Policy"> in
+    # df-client-app/index.html, plus frame-ancestors. Both are enforced and the effective
+    # policy is their intersection, so they must not diverge --
+    # src/test/contentSecurityPolicy.test.ts fails if they do.
+    add_header Content-Security-Policy "default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' 'sha256-hC4yLITI6QgJ9q9gPxAnKXkGcJVe+lNpHs4+YYDrr20=' https://*.googletagmanager.com https://stage.connect.irs.gov https://connect.irs.gov https://resources.digital-cloud-gov.medallia.com; style-src 'self' 'unsafe-inline' https://stage.connect.irs.gov https://connect.irs.gov; style-src-elem 'self' 'unsafe-inline' https://stage.connect.irs.gov https://connect.irs.gov; img-src 'self' data: https://*.google-analytics.com https://*.googletagmanager.com; font-src 'self' data:; connect-src 'self' https://*.google-analytics.com https://*.googletagmanager.com https://stage.connect.irs.gov https://connect.irs.gov; frame-src https://*.googletagmanager.com https://stage.connect.irs.gov https://connect.irs.gov; frame-ancestors 'none';" always;
+
+    location ~ ${DF_CLIENT_PUBLIC_PATH}/(assets|favicon|imgs)/ {
+        try_files $uri =404;
+    }
+
+    location / {
+        try_files $uri ${DF_CLIENT_PUBLIC_PATH}/index.html;
+    }
+}
