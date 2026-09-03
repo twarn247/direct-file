@@ -64,4 +64,22 @@ public class EncryptionContextsTest {
         assertThat(EncryptionPurpose.fromWireValue("not-a-purpose")).isEmpty();
         assertThat(EncryptionPurpose.fromWireValue(null)).isEmpty();
     }
+
+    @Test
+    void forPurpose_withRecordId_addsRecordWithoutDisturbingVerifiedKeys() {
+        Map<String, String> context =
+                EncryptionContexts.forPurpose(EncryptionPurpose.TAX_RETURN_FACTS, "actor-1", "row-42");
+        assertThat(context)
+                .containsEntry("purpose", "tax-return-facts")
+                .containsEntry("id", "actor-1")
+                .containsEntry("record", "row-42");
+    }
+
+    @Test
+    void forPurpose_withNullOrBlankRecordId_omitsRecordRatherThanWritingEmpty() {
+        assertThat(EncryptionContexts.forPurpose(EncryptionPurpose.TAX_RETURN_FACTS, "actor-1", null))
+                .doesNotContainKey("record");
+        assertThat(EncryptionContexts.forPurpose(EncryptionPurpose.TAX_RETURN_FACTS, "actor-1", "   "))
+                .doesNotContainKey("record");
+    }
 }

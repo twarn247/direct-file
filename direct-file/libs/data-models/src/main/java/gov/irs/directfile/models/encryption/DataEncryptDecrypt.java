@@ -28,12 +28,16 @@ public class DataEncryptDecrypt {
      */
     private static final String LEGACY_MARKER = "ENCRYPTION_CONTEXT_LEGACY";
 
+    /** As {@link #LEGACY_MARKER}, but for ciphertext seen with no bound record. */
+    private static final String RECORD_LEGACY_MARKER = "ENCRYPTION_CONTEXT_RECORD_LEGACY";
+
     private static final long LEGACY_LOG_EVERY = 1000L;
 
     private final AwsCrypto awsCrypto;
     private final CryptoMaterialsManager cryptoMaterialsManager;
     private final EncryptionContextProperties encryptionContextProperties;
     private final ConcurrentHashMap<EncryptionPurpose, AtomicLong> legacyCounts = new ConcurrentHashMap<>();
+    private final AtomicLong legacyRecordCount = new AtomicLong();
 
     public DataEncryptDecrypt(
             AwsCrypto awsCrypto,
@@ -45,8 +49,13 @@ public class DataEncryptDecrypt {
     }
 
     public byte[] encrypt(byte[] bytes, EncryptionPurpose purpose, String actorId) {
-        CryptoResult<byte[], ?> encryptResult =
-                awsCrypto.encryptData(cryptoMaterialsManager, bytes, EncryptionContexts.forPurpose(purpose, actorId));
+        return encrypt(bytes, purpose, actorId, null);
+    }
+
+    /** As {@link #encrypt(byte[], EncryptionPurpose, String)}, additionally binding a record id. */
+    public byte[] encrypt(byte[] bytes, EncryptionPurpose purpose, String actorId, String recordId) {
+        CryptoResult<byte[], ?> encryptResult = awsCrypto.encryptData(
+                cryptoMaterialsManager, bytes, EncryptionContexts.forPurpose(purpose, actorId, recordId));
         return encryptResult.getResult();
     }
 
@@ -56,14 +65,27 @@ public class DataEncryptDecrypt {
      * {@code direct-file.encryption.context-verification}.
      */
     public byte[] decrypt(byte[] ciphertext, EncryptionPurpose expected) {
+        return decrypt(ciphertext, expected, null);
+    }
+
+    /**
+     * As {@link #decrypt(byte[], EncryptionPurpose)}, additionally verifying the bound
+     * {@code record} equals {@code expectedRecordId} when non-null. A ciphertext with no
+     * bound record is accepted or rejected according to
+     * {@code direct-file.encryption.record-context-verification}; a ciphertext bound to a
+     * <em>different</em> record is always refused, in either mode.
+     */
+    public byte[] decrypt(byte[] ciphertext, EncryptionPurpose expected, String expectedRecordId) {
         return decryptAndVerify(
                 ciphertext,
                 expected,
+                expectedRecordId,
                 encryptionContextProperties.isEnforcing() ? UntaggedPolicy.REJECT : UntaggedPolicy.REPORT);
     }
 
     /**
-     * As {@link #decrypt}, but always tolerates untagged ciphertext regardless of mode.
+     * As {@link #decrypt(byte[], EncryptionPurpose)}, but always tolerates untagged ciphertext
+     * regardless of mode.
      *
      * <p>For the data-import populations only: their writers live outside this repository,
      * so this codebase cannot migrate them and the tolerance is permanent. It is a distinct
@@ -71,7 +93,7 @@ public class DataEncryptDecrypt {
      * Remove it when those writers adopt the purpose schema.
      */
     public byte[] decryptLegacyTolerant(byte[] ciphertext, EncryptionPurpose expected) {
-        return decryptAndVerify(ciphertext, expected, UntaggedPolicy.ACCEPT_SILENTLY);
+        return decryptAndVerify(ciphertext, expected, null, UntaggedPolicy.ACCEPT_SILENTLY);
     }
 
     /** What to do with ciphertext that carries no bound purpose. */
@@ -88,13 +110,14 @@ public class DataEncryptDecrypt {
         ACCEPT_SILENTLY
     }
 
-    private byte[] decryptAndVerify(byte[] ciphertext, EncryptionPurpose expected, UntaggedPolicy untaggedPolicy) {
+    private byte[] decryptAndVerify(
+            byte[] ciphertext, EncryptionPurpose expected, String expectedRecordId, UntaggedPolicy untaggedPolicy) {
         CryptoResult<byte[], ?> decryptResult = awsCrypto.decryptData(cryptoMaterialsManager, ciphertext);
         Map<String, String> context = decryptResult.getEncryptionContext();
-        String found = context == null ? null : context.get(EncryptionContexts.PURPOSE_KEY);
+        String foundPurpose = context == null ? null : context.get(EncryptionContexts.PURPOSE_KEY);
         byte[] plaintext = decryptResult.getResult();
 
-        if (found == null) {
+        if (foundPurpose == null) {
             if (untaggedPolicy == UntaggedPolicy.REJECT) {
                 return refuse(plaintext, expected, null);
             }
@@ -104,8 +127,20 @@ public class DataEncryptDecrypt {
             return plaintext;
         }
 
-        if (!found.equals(expected.wireValue())) {
-            return refuse(plaintext, expected, found);
+        if (!foundPurpose.equals(expected.wireValue())) {
+            return refuse(plaintext, expected, foundPurpose);
+        }
+
+        if (expectedRecordId != null) {
+            String foundRecord = context.get(EncryptionContexts.RECORD_KEY);
+            if (foundRecord == null) {
+                if (encryptionContextProperties.isRecordEnforcing()) {
+                    return refuseRecordMismatch(plaintext, expectedRecordId, null);
+                }
+                reportLegacyRecord();
+            } else if (!foundRecord.equals(expectedRecordId)) {
+                return refuseRecordMismatch(plaintext, expectedRecordId, foundRecord);
+            }
         }
 
         return plaintext;
@@ -137,12 +172,34 @@ public class DataEncryptDecrypt {
     }
 
     /**
+     * As {@link #refuse}, but for a record mismatch rather than a purpose mismatch. A distinct
+     * method rather than a shared one with a field-name parameter: the two failure modes have
+     * different messages and no shared sanitization logic (a record id is a UUID string, not a
+     * value from a closed enum), and keeping them apart matches how {@link
+     * #decryptLegacyTolerant} is a distinct method rather than a config branch on the same one.
+     */
+    private byte[] refuseRecordMismatch(byte[] plaintext, String expectedRecordId, String foundRecordId) {
+        String message = "encryption context record mismatch: expected record=" + expectedRecordId + ", found record="
+                + (foundRecordId == null ? "<none>" : foundRecordId);
+        log.error("{}: {}", EncryptionContextMismatchException.MARKER, message);
+        Arrays.fill(plaintext, (byte) 0);
+        throw new EncryptionContextMismatchException(message);
+    }
+
+    /**
      * Untagged decrypts seen by this instance for {@code purpose}. Package-private: it exists so
      * tests can assert that the permanently-pinned paths do not inflate the Phase C gate's signal.
      */
     long legacyCountFor(EncryptionPurpose purpose) {
         AtomicLong count = legacyCounts.get(purpose);
         return count == null ? 0L : count.get();
+    }
+
+    /** As {@link #legacyCountFor}, but for the record key. Not split by purpose: unlike purpose
+     * mismatches, which are meaningful per data type, "how many rows have no bound record yet"
+     * is one number regardless of which column it came from. */
+    long legacyRecordCount() {
+        return legacyRecordCount.get();
     }
 
     private void reportLegacy(EncryptionPurpose expected) {
@@ -154,6 +211,14 @@ public class DataEncryptDecrypt {
                     LEGACY_MARKER,
                     expected.wireValue(),
                     count);
+        }
+    }
+
+    private void reportLegacyRecord() {
+        long count = legacyRecordCount.incrementAndGet();
+        if (count == 1L || count % LEGACY_LOG_EVERY == 0L) {
+            log.warn(
+                    "{}: decrypted ciphertext with no bound record, countThisInstance={}", RECORD_LEGACY_MARKER, count);
         }
     }
 
