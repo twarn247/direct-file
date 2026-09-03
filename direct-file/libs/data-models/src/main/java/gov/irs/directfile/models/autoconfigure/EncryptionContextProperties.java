@@ -19,15 +19,33 @@ public class EncryptionContextProperties {
      */
     private String contextVerification = WARN;
 
+    /**
+     * As {@link #contextVerification}, but for the {@code record} key rather than
+     * {@code purpose}, and independent of it: {@code purpose} enforcement could be turned on
+     * before every row carries a bound {@code record}, and doing so must not also start
+     * rejecting rows the record backfill has not reached yet. A ciphertext carrying the
+     * <em>wrong</em> record is rejected under both modes, exactly as a wrong purpose is.
+     */
+    private String recordContextVerification = WARN;
+
     public boolean isEnforcing() {
         return ENFORCE.equalsIgnoreCase(contextVerification);
     }
 
+    public boolean isRecordEnforcing() {
+        return ENFORCE.equalsIgnoreCase(recordContextVerification);
+    }
+
     @PostConstruct
-    void validate() {
-        if (!WARN.equalsIgnoreCase(contextVerification) && !ENFORCE.equalsIgnoreCase(contextVerification)) {
-            throw new IllegalStateException("direct-file.encryption.context-verification must be '" + WARN + "' or '"
-                    + ENFORCE + "', got: " + contextVerification);
+    public void validate() {
+        validateMode("context-verification", contextVerification);
+        validateMode("record-context-verification", recordContextVerification);
+    }
+
+    private static void validateMode(String propertyName, String value) {
+        if (!WARN.equalsIgnoreCase(value) && !ENFORCE.equalsIgnoreCase(value)) {
+            throw new IllegalStateException("direct-file.encryption." + propertyName + " must be '" + WARN + "' or '"
+                    + ENFORCE + "', got: " + value);
         }
     }
 }

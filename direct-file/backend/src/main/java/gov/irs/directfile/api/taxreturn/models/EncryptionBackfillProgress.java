@@ -38,6 +38,22 @@ public class EncryptionBackfillProgress {
     @Column(name = "completed", nullable = false)
     private boolean completed;
 
+    /** Rows this sweep has tried to migrate, across every batch. Never decreases. */
+    @Column(name = "attempted", nullable = false)
+    private int attempted;
+
+    /** Rows successfully re-encrypted. {@code attempted - succeeded == failed}, always. */
+    @Column(name = "succeeded", nullable = false)
+    private int succeeded;
+
+    /**
+     * Rows the sweep could not migrate and advanced past. {@code completed && failed == 0}
+     * is the only durable signal that a sweep actually finished cleanly — see {@link
+     * EncryptionBackfillProgressRepository#allTablesCleanlyMigrated()}.
+     */
+    @Column(name = "failed", nullable = false)
+    private int failed;
+
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
     private Date updatedAt;

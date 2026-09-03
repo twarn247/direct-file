@@ -51,7 +51,14 @@ public class UserService {
         if (tin == null) {
             return null;
         }
-        return tin.length() <= 4 ? tin : tin.substring(tin.length() - 4);
+        if (tin.length() < 4) {
+            // Malformed: a real TIN is never this short. Emitting it unchanged would put
+            // more into the audit map than "last four" promises, for no operational benefit
+            // -- a fixed placeholder is both safer and a clearer signal that validation
+            // upstream of this method failed.
+            return "????";
+        }
+        return tin.substring(tin.length() - 4);
     }
 
     @Transactional(readOnly = true)

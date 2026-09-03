@@ -50,6 +50,12 @@ public class EncryptionBackfillWorker {
      */
     public static final String LOCK_RELEASE_FAILURE_MARKER = "ENCRYPTION_BACKFILL_LOCK_RELEASE_FAILED";
 
+    /** Distinguishes this lock's keyspace from TaxReturnService's per-return submission locks,
+     * which share the same single 32-bit pg_try_advisory_lock(int) space by hashing an
+     * unrelated value (a tax return UUID) into it. Any fixed, arbitrary value works here --
+     * what matters is that it differs from the namespace TaxReturnService uses. */
+    private static final int NAMESPACE = "encryption-backfill".hashCode();
+
     /** String.hashCode() is specified and stable across JVM restarts, unlike Object.hashCode(). */
     private static final int LOCK_ID = "encryption-backfill-sweep".hashCode();
 
@@ -84,9 +90,10 @@ public class EncryptionBackfillWorker {
         if (!enabled) {
             return;
         }
-        if (encryptionContextProperties.isEnforcing()) {
-            throw new IllegalStateException("The encryption backfill requires "
-                    + "direct-file.encryption.context-verification=warn. Under enforce, untagged "
+        if (encryptionContextProperties.isEnforcing() || encryptionContextProperties.isRecordEnforcing()) {
+            throw new IllegalStateException("The encryption backfill requires both "
+                    + "direct-file.encryption.context-verification and "
+                    + "direct-file.encryption.record-context-verification to be 'warn'. Under enforce, untagged "
                     + "ciphertext cannot be read, so the sweep would skip every row it exists to migrate.");
         }
         log.warn("Encryption backfill is ENABLED, batchSize={}", batchSize);
@@ -101,7 +108,7 @@ public class EncryptionBackfillWorker {
 
         // Non-blocking: if another instance already holds the lock, skip this tick rather
         // than wait. The next tick, on this or another instance, tries again.
-        if (!advisoryLockRepository.acquireLock(LOCK_ID)) {
+        if (!advisoryLockRepository.acquireLock(NAMESPACE, LOCK_ID)) {
             log.debug("Encryption backfill tick skipped: another instance holds the advisory lock");
             return;
         }
@@ -121,7 +128,7 @@ public class EncryptionBackfillWorker {
                 logProgress(EncryptionBackfillProgress.TAX_RETURN_SUBMISSIONS, submissions);
             }
         } finally {
-            if (!advisoryLockRepository.releaseLock(LOCK_ID)) {
+            if (!advisoryLockRepository.releaseLock(NAMESPACE, LOCK_ID)) {
                 log.warn(
                         "{}: advisory lock (id={}) failed to release -- it will remain held "
                                 + "until this connection is returned to the pool and reset",

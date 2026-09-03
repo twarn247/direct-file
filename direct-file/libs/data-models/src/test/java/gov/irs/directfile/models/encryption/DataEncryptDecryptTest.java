@@ -45,6 +45,13 @@ public class DataEncryptDecryptTest {
         return new DataEncryptDecrypt(awsCrypto, cmm, properties);
     }
 
+    private DataEncryptDecrypt subject(String contextMode, String recordMode) {
+        EncryptionContextProperties properties = new EncryptionContextProperties();
+        properties.setContextVerification(contextMode);
+        properties.setRecordContextVerification(recordMode);
+        return new DataEncryptDecrypt(awsCrypto, cmm, properties);
+    }
+
     @Test
     void roundTripsUnderMatchingPurpose() {
         DataEncryptDecrypt subject = subject("warn");
@@ -185,5 +192,97 @@ public class DataEncryptDecryptTest {
         } finally {
             logger.detachAppender(appender);
         }
+    }
+
+    @Test
+    void roundTripsUnderMatchingPurposeAndRecord() {
+        DataEncryptDecrypt subject = subject("warn", "warn");
+        byte[] ciphertext = subject.encrypt(PLAINTEXT, EncryptionPurpose.TAX_RETURN_FACTS, null, "row-1");
+        assertThat(subject.decrypt(ciphertext, EncryptionPurpose.TAX_RETURN_FACTS, "row-1"))
+                .isEqualTo(PLAINTEXT);
+    }
+
+    @Test
+    void rejectsARecordSwap_regardlessOfRecordMode() {
+        // The scenario D-1 exists to close: two rows under the same purpose, substituted.
+        DataEncryptDecrypt subject = subject("warn", "warn");
+        byte[] taxpayerA = subject.encrypt(PLAINTEXT, EncryptionPurpose.TAX_RETURN_FACTS, null, "row-a");
+        assertThatThrownBy(() -> subject.decrypt(taxpayerA, EncryptionPurpose.TAX_RETURN_FACTS, "row-b"))
+                .isInstanceOf(EncryptionContextMismatchException.class);
+    }
+
+    @Test
+    void rejectsARecordSwap_inEnforceModeToo() {
+        DataEncryptDecrypt subject = subject("enforce", "enforce");
+        byte[] taxpayerA = subject.encrypt(PLAINTEXT, EncryptionPurpose.TAX_RETURN_FACTS, null, "row-a");
+        assertThatThrownBy(() -> subject.decrypt(taxpayerA, EncryptionPurpose.TAX_RETURN_FACTS, "row-b"))
+                .isInstanceOf(EncryptionContextMismatchException.class);
+    }
+
+    @Test
+    void acceptsUnboundRecordUnderRecordWarnMode() {
+        // Not yet migrated by the record backfill -- accepted, and reported.
+        DataEncryptDecrypt subject = subject("warn", "warn");
+        byte[] unbound = subject.encrypt(PLAINTEXT, EncryptionPurpose.TAX_RETURN_FACTS, null);
+        assertThat(subject.decrypt(unbound, EncryptionPurpose.TAX_RETURN_FACTS, "row-1"))
+                .isEqualTo(PLAINTEXT);
+    }
+
+    @Test
+    void rejectsUnboundRecordUnderRecordEnforceMode() {
+        DataEncryptDecrypt subject = subject("warn", "enforce");
+        byte[] unbound = subject.encrypt(PLAINTEXT, EncryptionPurpose.TAX_RETURN_FACTS, null);
+        assertThatThrownBy(() -> subject.decrypt(unbound, EncryptionPurpose.TAX_RETURN_FACTS, "row-1"))
+                .isInstanceOf(EncryptionContextMismatchException.class);
+    }
+
+    @Test
+    void recordVerificationIsSkippedWhenNoRecordIsExpected() {
+        // Callers with no natural per-row identity -- state-api's export token, for one --
+        // pass no expected record and must not be affected by record mode at all.
+        DataEncryptDecrypt subject = subject("warn", "enforce");
+        byte[] ciphertext = subject.encrypt(PLAINTEXT, EncryptionPurpose.STATE_EXPORT_TOKEN, null);
+        assertThat(subject.decrypt(ciphertext, EncryptionPurpose.STATE_EXPORT_TOKEN))
+                .isEqualTo(PLAINTEXT);
+    }
+
+    @Test
+    void purposeAndRecordEnforcementAreIndependent() {
+        // Purpose enforcement on, record still warn: an unbound record is tolerated even
+        // though purpose enforcement is strict. This is the exact bootstrapping case the
+        // separate flag exists for.
+        DataEncryptDecrypt subject = subject("enforce", "warn");
+        byte[] taggedPurposeOnly = subject.encrypt(PLAINTEXT, EncryptionPurpose.TAX_RETURN_FACTS, null);
+        assertThat(subject.decrypt(taggedPurposeOnly, EncryptionPurpose.TAX_RETURN_FACTS, "row-1"))
+                .isEqualTo(PLAINTEXT);
+    }
+
+    @Test
+    void warnModeReportsUnboundRecord_soAGateHasASignal() {
+        DataEncryptDecrypt subject = subject("warn", "warn");
+        byte[] unbound = subject.encrypt(PLAINTEXT, EncryptionPurpose.TAX_RETURN_FACTS, null);
+
+        subject.decrypt(unbound, EncryptionPurpose.TAX_RETURN_FACTS, "row-1");
+
+        assertThat(subject.legacyRecordCount()).isEqualTo(1L);
+    }
+
+    @Test
+    void recordMismatchMessageNamesRecordsAndNothingElse() {
+        DataEncryptDecrypt subject = subject("warn", "warn");
+        byte[] ciphertext = subject.encrypt(PLAINTEXT, EncryptionPurpose.TAX_RETURN_FACTS, "actor-1", "row-a");
+        assertThatThrownBy(() -> subject.decrypt(ciphertext, EncryptionPurpose.TAX_RETURN_FACTS, "row-b"))
+                .hasMessageContaining("row-a")
+                .hasMessageContaining("row-b")
+                .hasMessageNotContaining("actor-1");
+    }
+
+    @Test
+    void invalidRecordVerificationModeRefusesToStart() {
+        EncryptionContextProperties properties = new EncryptionContextProperties();
+        properties.setRecordContextVerification("sometimes");
+        assertThatThrownBy(properties::validate)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("record-context-verification");
     }
 }

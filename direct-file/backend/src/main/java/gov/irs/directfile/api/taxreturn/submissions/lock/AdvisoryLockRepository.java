@@ -24,4 +24,10 @@ public interface AdvisoryLockRepository extends JpaRepository<TaxReturn, UUID> {
 
     @Query(value = "SELECT pg_advisory_unlock(:lockId)", nativeQuery = true)
     boolean releaseLock(int lockId);
+
+    @Query(value = "SELECT pg_try_advisory_lock(:namespace, :lockId)", nativeQuery = true)
+    boolean acquireLock(int namespace, int lockId);
+
+    @Query(value = "SELECT pg_advisory_unlock(:namespace, :lockId)", nativeQuery = true)
+    boolean releaseLock(int namespace, int lockId);
 }

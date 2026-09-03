@@ -175,9 +175,9 @@ class TaxReturnRepositoryTest extends BaseRepositoryTest {
         TaxReturn taxReturn = TaxReturn.testObjectFactoryNoId();
         taxReturn.setFacts(Map.of("testA", new FactTypeWithItem("typeA", new IntNode(24))));
         byte[] factsBytes = objectMapper.writeValueAsBytes(taxReturn.getFacts());
-        when(dataEncryptDecrypt.encrypt(eq(factsBytes), any(EncryptionPurpose.class), any()))
+        when(dataEncryptDecrypt.encrypt(eq(factsBytes), any(EncryptionPurpose.class), any(), any()))
                 .thenReturn(factsBytes);
-        when(dataEncryptDecrypt.decrypt(eq(factsBytes), any(EncryptionPurpose.class)))
+        when(dataEncryptDecrypt.decrypt(eq(factsBytes), any(EncryptionPurpose.class), any()))
                 .thenReturn(factsBytes);
         user.addTaxReturn(taxReturn);
         entityManager.persist(taxReturn);

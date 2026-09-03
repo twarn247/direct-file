@@ -127,7 +127,9 @@ class UserServiceTest {
 
         userService.getCurrentUserInfo();
 
-        // Never pad, never substring past the end, never log more than four characters.
-        verify(auditService).addEventProperty(AuditLogElement.USER_TIN_LAST4, "12");
+        // A TIN this short is malformed and should not exist. A fixed placeholder is both
+        // safer than forwarding it unchanged and a clearer signal that something upstream
+        // is wrong, regardless of how short the input actually was.
+        verify(auditService).addEventProperty(AuditLogElement.USER_TIN_LAST4, "????");
     }
 }

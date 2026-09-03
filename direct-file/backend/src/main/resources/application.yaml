@@ -414,6 +414,11 @@ direct-file:
   encryption:
     # H-1 Phase B. Off by default; enabling requires context-verification=warn and the
     # two owner approvals in docs/security/2026-08-25_h1-encryption-context-spec.md §6.
+    # record-context-verification also defaults to warn (see EncryptionContextProperties)
+    # and is not set here for the same reason context-verification is not: neither has ever
+    # been flipped to enforce in this codebase. Flipping either is an operator decision
+    # gated by EncryptionBackfillProgressRepository.allTablesCleanlyMigrated(), not a step
+    # in any plan.
     backfill:
       enabled: false
       batch-size: 100

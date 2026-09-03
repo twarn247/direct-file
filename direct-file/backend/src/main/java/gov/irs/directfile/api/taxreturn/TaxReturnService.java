@@ -73,6 +73,13 @@ import gov.irs.directfile.models.message.event.SubmissionEventTypeEnum;
 public class TaxReturnService {
     private static final Duration REST_CLIENT_TIMEOUT = Duration.ofSeconds(5);
     public static final String UTC_TIMEZONE_NAME = "UTC";
+
+    /** Distinguishes this lock's keyspace from EncryptionBackfillWorker's sweep lock, which
+     * shares the same single 32-bit pg_try_advisory_lock(int) space via a different fixed
+     * hash. Any fixed, arbitrary value works here -- what matters is that it differs from
+     * that one. */
+    private static final int SUBMISSION_LOCK_NAMESPACE = "tax-return-submission".hashCode();
+
     private final TaxReturnRepository taxReturnRepo;
     private final TaxReturnSubmissionRepository taxReturnSubmissionRepo;
     private final AuditService auditService;
@@ -383,7 +390,7 @@ public class TaxReturnService {
         // other threads to lock other IDs.
 
         int lockId = taxReturnId.hashCode();
-        boolean lockAcquired = advisoryLockRepository.acquireLock(lockId);
+        boolean lockAcquired = advisoryLockRepository.acquireLock(SUBMISSION_LOCK_NAMESPACE, lockId);
         if (lockAcquired) {
             log.info("Advisory lock acquired successfully for taxReturnId={}, lockId={}", taxReturnId, lockId);
             try {
@@ -396,7 +403,7 @@ public class TaxReturnService {
                 throw new FactGraphParseResponseStatusException(e);
             } finally {
                 // Regardless of the outcome, release the acquired lock
-                advisoryLockRepository.releaseLock(lockId);
+                advisoryLockRepository.releaseLock(SUBMISSION_LOCK_NAMESPACE, lockId);
             }
         } else {
             // If the lock cannot be acquired, log an error and throw an exception.

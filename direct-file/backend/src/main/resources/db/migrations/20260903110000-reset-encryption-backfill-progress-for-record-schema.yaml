@@ -1,0 +1,34 @@
+databaseChangeLog:
+  - changeSet:
+      id: reset-encryption-backfill-progress-for-record-schema
+      author: directfile
+      comment: >
+        TaxReturnEntityListener now binds a record identity in addition to purpose
+        (D-1 of the 2026-09-02 delta security review). The sweep mechanism re-encrypts
+        whatever the listener's current schema produces on every dirty-and-save -- it
+        does not need new tracking keys, only a reason to run from the start again.
+        Resetting these two rows is that reason. This is data, not schema: safe to run
+        more than once, and each existing row is reset to the same "not started" state
+        EncryptionBackfillService already treats a missing row as.
+      changes:
+        - update:
+            tableName: encryption_backfill_progress
+            columns:
+              - column:
+                  name: last_id
+                  value: null
+              - column:
+                  name: completed
+                  valueBoolean: false
+              - column:
+                  name: attempted
+                  valueNumeric: 0
+              - column:
+                  name: succeeded
+                  valueNumeric: 0
+              - column:
+                  name: failed
+                  valueNumeric: 0
+            where: target_table IN ('taxreturns', 'taxreturn_submissions')
+      rollback:
+        - empty

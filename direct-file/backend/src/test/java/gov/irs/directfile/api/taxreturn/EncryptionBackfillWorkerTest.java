@@ -39,6 +39,13 @@ class EncryptionBackfillWorkerTest {
         return properties;
     }
 
+    private EncryptionContextProperties recordEnforceMode() {
+        EncryptionContextProperties properties = new EncryptionContextProperties();
+        properties.setContextVerification(EncryptionContextProperties.WARN);
+        properties.setRecordContextVerification(EncryptionContextProperties.ENFORCE);
+        return properties;
+    }
+
     @Test
     void refusesToStartUnderEnforceMode() {
         EncryptionBackfillWorker worker =
@@ -47,6 +54,16 @@ class EncryptionBackfillWorkerTest {
         assertThatThrownBy(worker::verifyRunnable)
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("warn");
+    }
+
+    @Test
+    void refusesToStartUnderRecordEnforceModeToo() {
+        EncryptionBackfillWorker worker =
+                new EncryptionBackfillWorker(service, recordEnforceMode(), advisoryLockRepository, true, 100);
+
+        assertThatThrownBy(worker::verifyRunnable)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("record-context-verification");
     }
 
     @Test
@@ -67,25 +84,25 @@ class EncryptionBackfillWorkerTest {
         verify(service, never()).processNextBatch(any(), anyInt());
         // Disabled short-circuits before ever touching the lock, so an idle replica with
         // the flag off never contends for it.
-        verify(advisoryLockRepository, never()).acquireLock(anyInt());
+        verify(advisoryLockRepository, never()).acquireLock(anyInt(), anyInt());
     }
 
     @Test
     void doesNothingWhenAnotherInstanceHoldsTheLock() {
-        when(advisoryLockRepository.acquireLock(anyInt())).thenReturn(false);
+        when(advisoryLockRepository.acquireLock(anyInt(), anyInt())).thenReturn(false);
         EncryptionBackfillWorker worker =
                 new EncryptionBackfillWorker(service, warnMode(), advisoryLockRepository, true, 100);
 
         worker.tick();
 
         verify(service, never()).processNextBatch(any(), anyInt());
-        verify(advisoryLockRepository, never()).releaseLock(anyInt());
+        verify(advisoryLockRepository, never()).releaseLock(anyInt(), anyInt());
     }
 
     @Test
     void releasesTheLockAfterATick() {
-        when(advisoryLockRepository.acquireLock(anyInt())).thenReturn(true);
-        when(advisoryLockRepository.releaseLock(anyInt())).thenReturn(true);
+        when(advisoryLockRepository.acquireLock(anyInt(), anyInt())).thenReturn(true);
+        when(advisoryLockRepository.releaseLock(anyInt(), anyInt())).thenReturn(true);
         when(service.processNextBatch(eq(EncryptionBackfillProgress.TAX_RETURNS), anyInt()))
                 .thenReturn(new EncryptionBackfillService.BatchResult(0, 0, true));
         when(service.processNextBatch(eq(EncryptionBackfillProgress.TAX_RETURN_SUBMISSIONS), anyInt()))
@@ -95,13 +112,13 @@ class EncryptionBackfillWorkerTest {
 
         worker.tick();
 
-        verify(advisoryLockRepository).releaseLock(anyInt());
+        verify(advisoryLockRepository).releaseLock(anyInt(), anyInt());
     }
 
     @Test
     void releasesTheLockEvenWhenABatchThrows() {
-        when(advisoryLockRepository.acquireLock(anyInt())).thenReturn(true);
-        when(advisoryLockRepository.releaseLock(anyInt())).thenReturn(true);
+        when(advisoryLockRepository.acquireLock(anyInt(), anyInt())).thenReturn(true);
+        when(advisoryLockRepository.releaseLock(anyInt(), anyInt())).thenReturn(true);
         when(service.processNextBatch(eq(EncryptionBackfillProgress.TAX_RETURNS), anyInt()))
                 .thenThrow(new RuntimeException("boom"));
         EncryptionBackfillWorker worker =
@@ -109,7 +126,7 @@ class EncryptionBackfillWorkerTest {
 
         assertThatThrownBy(worker::tick).isInstanceOf(RuntimeException.class);
 
-        verify(advisoryLockRepository).releaseLock(anyInt());
+        verify(advisoryLockRepository).releaseLock(anyInt(), anyInt());
     }
 
     @Test
@@ -118,8 +135,8 @@ class EncryptionBackfillWorkerTest {
         // landed on the wrong session, a failed release must not fail the tick -- it's
         // logged (ENCRYPTION_BACKFILL_ROW_FAILED-style visibility for an operator, not a
         // thrown exception) so the sweep's own work already committed is not undone by it.
-        when(advisoryLockRepository.acquireLock(anyInt())).thenReturn(true);
-        when(advisoryLockRepository.releaseLock(anyInt())).thenReturn(false);
+        when(advisoryLockRepository.acquireLock(anyInt(), anyInt())).thenReturn(true);
+        when(advisoryLockRepository.releaseLock(anyInt(), anyInt())).thenReturn(false);
         when(service.processNextBatch(eq(EncryptionBackfillProgress.TAX_RETURNS), anyInt()))
                 .thenReturn(new EncryptionBackfillService.BatchResult(0, 0, true));
         when(service.processNextBatch(eq(EncryptionBackfillProgress.TAX_RETURN_SUBMISSIONS), anyInt()))
@@ -129,13 +146,13 @@ class EncryptionBackfillWorkerTest {
 
         worker.tick();
 
-        verify(advisoryLockRepository).releaseLock(anyInt());
+        verify(advisoryLockRepository).releaseLock(anyInt(), anyInt());
     }
 
     @Test
     void sweepsTaxReturnsBeforeSubmissions() {
-        when(advisoryLockRepository.acquireLock(anyInt())).thenReturn(true);
-        when(advisoryLockRepository.releaseLock(anyInt())).thenReturn(true);
+        when(advisoryLockRepository.acquireLock(anyInt(), anyInt())).thenReturn(true);
+        when(advisoryLockRepository.releaseLock(anyInt(), anyInt())).thenReturn(true);
         when(service.processNextBatch(eq(EncryptionBackfillProgress.TAX_RETURNS), anyInt()))
                 .thenReturn(new EncryptionBackfillService.BatchResult(10, 10, false));
         EncryptionBackfillWorker worker =
@@ -149,8 +166,8 @@ class EncryptionBackfillWorkerTest {
 
     @Test
     void movesToSubmissionsOnceTaxReturnsAreComplete() {
-        when(advisoryLockRepository.acquireLock(anyInt())).thenReturn(true);
-        when(advisoryLockRepository.releaseLock(anyInt())).thenReturn(true);
+        when(advisoryLockRepository.acquireLock(anyInt(), anyInt())).thenReturn(true);
+        when(advisoryLockRepository.releaseLock(anyInt(), anyInt())).thenReturn(true);
         when(service.processNextBatch(eq(EncryptionBackfillProgress.TAX_RETURNS), anyInt()))
                 .thenReturn(new EncryptionBackfillService.BatchResult(0, 0, true));
         when(service.processNextBatch(eq(EncryptionBackfillProgress.TAX_RETURN_SUBMISSIONS), anyInt()))
