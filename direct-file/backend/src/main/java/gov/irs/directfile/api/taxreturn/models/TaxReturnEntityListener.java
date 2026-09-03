@@ -33,10 +33,11 @@ public class TaxReturnEntityListener {
 
     @PostLoad
     public <T extends TaxReturnEntity> void decryptColumns(T taxReturn) {
+        String recordId = taxReturn.getId().toString();
         taxReturn.setFactsWithoutDirtyingEntity(factsEncryptor.convertToEntityAttribute(
-                taxReturn.getFactsCipherText(), EncryptionPurpose.TAX_RETURN_FACTS));
+                taxReturn.getFactsCipherText(), EncryptionPurpose.TAX_RETURN_FACTS, recordId));
         taxReturn.setStoreWithoutDirtyingEntity(genericStringEncryptor.convertToEntityAttribute(
-                taxReturn.getStoreCipherText(), EncryptionPurpose.TAX_RETURN_STORE));
+                taxReturn.getStoreCipherText(), EncryptionPurpose.TAX_RETURN_STORE, recordId));
     }
 
     @PrePersist
@@ -51,9 +52,10 @@ public class TaxReturnEntityListener {
             actorId = null;
         }
 
+        String recordId = taxReturn.getId().toString();
         taxReturn.setFactsCipherText(factsEncryptor.convertToDatabaseColumn(
-                taxReturn.getFacts(), EncryptionPurpose.TAX_RETURN_FACTS, actorId));
+                taxReturn.getFacts(), EncryptionPurpose.TAX_RETURN_FACTS, actorId, recordId));
         taxReturn.setStoreCipherText(genericStringEncryptor.convertToDatabaseColumn(
-                taxReturn.getStore(), EncryptionPurpose.TAX_RETURN_STORE, actorId));
+                taxReturn.getStore(), EncryptionPurpose.TAX_RETURN_STORE, actorId, recordId));
     }
 }

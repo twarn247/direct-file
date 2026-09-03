@@ -39,6 +39,13 @@ class EncryptionBackfillWorkerTest {
         return properties;
     }
 
+    private EncryptionContextProperties recordEnforceMode() {
+        EncryptionContextProperties properties = new EncryptionContextProperties();
+        properties.setContextVerification(EncryptionContextProperties.WARN);
+        properties.setRecordContextVerification(EncryptionContextProperties.ENFORCE);
+        return properties;
+    }
+
     @Test
     void refusesToStartUnderEnforceMode() {
         EncryptionBackfillWorker worker =
@@ -47,6 +54,16 @@ class EncryptionBackfillWorkerTest {
         assertThatThrownBy(worker::verifyRunnable)
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("warn");
+    }
+
+    @Test
+    void refusesToStartUnderRecordEnforceModeToo() {
+        EncryptionBackfillWorker worker =
+                new EncryptionBackfillWorker(service, recordEnforceMode(), advisoryLockRepository, true, 100);
+
+        assertThatThrownBy(worker::verifyRunnable)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("record-context-verification");
     }
 
     @Test

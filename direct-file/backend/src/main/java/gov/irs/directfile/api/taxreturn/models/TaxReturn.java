@@ -24,6 +24,7 @@ public class TaxReturn implements TaxReturnEntity {
     private static final String DD = "DD-to-force-reencryption-by-entity-listener";
 
     @Id
+    @Setter
     @GeneratedValue(generator = "UUID4")
     @Column(nullable = false, updatable = false)
     private UUID id;

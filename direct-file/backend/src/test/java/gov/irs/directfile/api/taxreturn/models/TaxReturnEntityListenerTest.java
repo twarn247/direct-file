@@ -54,7 +54,7 @@ public class TaxReturnEntityListenerTest {
 
         ded = mock(DataEncryptDecrypt.class);
         identitySupplier = mock(IdentitySupplier.class);
-        when(ded.encrypt(any(), any(EncryptionPurpose.class), any())).thenReturn(new byte[] {1, 2, 3});
+        when(ded.encrypt(any(), any(EncryptionPurpose.class), any(), any())).thenReturn(new byte[] {1, 2, 3});
         listener = new TaxReturnEntityListener();
         listener.configure(identitySupplier, ded, new ObjectMapper());
     }
@@ -68,6 +68,7 @@ public class TaxReturnEntityListenerTest {
 
     private TaxReturn taxReturnWithContent() {
         TaxReturn taxReturn = new TaxReturn();
+        taxReturn.setId(java.util.UUID.randomUUID());
         taxReturn.setFacts(Map.of(
                 "/foo",
                 new FactTypeWithItem(
@@ -81,6 +82,7 @@ public class TaxReturnEntityListenerTest {
     void encryptColumns_writesFactsAndStoreUnderDistinctPurposes() {
         when(identitySupplier.get()).thenThrow(new NullAuthenticationException());
         TaxReturn taxReturn = new TaxReturn();
+        taxReturn.setId(UUID.randomUUID());
         taxReturn.setFacts(Map.of(
                 "/foo",
                 new FactTypeWithItem(
@@ -91,7 +93,7 @@ public class TaxReturnEntityListenerTest {
         listener.encryptColumns(taxReturn);
 
         ArgumentCaptor<EncryptionPurpose> purposes = ArgumentCaptor.captor();
-        verify(ded, org.mockito.Mockito.times(2)).encrypt(any(), purposes.capture(), any());
+        verify(ded, org.mockito.Mockito.times(2)).encrypt(any(), purposes.capture(), any(), any());
         assertThat(purposes.getAllValues())
                 .containsExactly(EncryptionPurpose.TAX_RETURN_FACTS, EncryptionPurpose.TAX_RETURN_STORE);
     }
@@ -107,7 +109,8 @@ public class TaxReturnEntityListenerTest {
         listener.encryptColumns(taxReturnWithContent());
 
         ArgumentCaptor<String> actorId = ArgumentCaptor.captor();
-        verify(ded, org.mockito.Mockito.times(2)).encrypt(any(), any(EncryptionPurpose.class), actorId.capture());
+        verify(ded, org.mockito.Mockito.times(2))
+                .encrypt(any(), any(EncryptionPurpose.class), actorId.capture(), any());
         assertThat(actorId.getAllValues()).containsExactly(externalId.toString(), externalId.toString());
     }
 
@@ -118,21 +121,23 @@ public class TaxReturnEntityListenerTest {
         listener.encryptColumns(taxReturnWithContent());
 
         ArgumentCaptor<String> actorId = ArgumentCaptor.captor();
-        verify(ded, org.mockito.Mockito.times(2)).encrypt(any(), any(EncryptionPurpose.class), actorId.capture());
+        verify(ded, org.mockito.Mockito.times(2))
+                .encrypt(any(), any(EncryptionPurpose.class), actorId.capture(), any());
         assertThat(actorId.getAllValues()).containsExactly(null, null);
     }
 
     @Test
     void decryptColumns_readsEachColumnUnderItsOwnPurpose() {
-        when(ded.decrypt(any(), any(EncryptionPurpose.class))).thenReturn("{}".getBytes());
+        when(ded.decrypt(any(), any(EncryptionPurpose.class), any())).thenReturn("{}".getBytes());
         TaxReturn taxReturn = new TaxReturn();
+        taxReturn.setId(UUID.randomUUID());
         taxReturn.setFactsCipherText(java.util.Base64.getEncoder().encodeToString(new byte[] {1, 2, 3}));
         taxReturn.setStoreCipherText(java.util.Base64.getEncoder().encodeToString(new byte[] {1, 2, 3}));
 
         listener.decryptColumns(taxReturn);
 
         ArgumentCaptor<EncryptionPurpose> purposes = ArgumentCaptor.captor();
-        verify(ded, org.mockito.Mockito.times(2)).decrypt(any(), purposes.capture());
+        verify(ded, org.mockito.Mockito.times(2)).decrypt(any(), purposes.capture(), any());
         assertThat(purposes.getAllValues())
                 .containsExactly(EncryptionPurpose.TAX_RETURN_FACTS, EncryptionPurpose.TAX_RETURN_STORE);
     }

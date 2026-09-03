@@ -84,9 +84,10 @@ public class EncryptionBackfillWorker {
         if (!enabled) {
             return;
         }
-        if (encryptionContextProperties.isEnforcing()) {
-            throw new IllegalStateException("The encryption backfill requires "
-                    + "direct-file.encryption.context-verification=warn. Under enforce, untagged "
+        if (encryptionContextProperties.isEnforcing() || encryptionContextProperties.isRecordEnforcing()) {
+            throw new IllegalStateException("The encryption backfill requires both "
+                    + "direct-file.encryption.context-verification and "
+                    + "direct-file.encryption.record-context-verification to be 'warn'. Under enforce, untagged "
                     + "ciphertext cannot be read, so the sweep would skip every row it exists to migrate.");
         }
         log.warn("Encryption backfill is ENABLED, batchSize={}", batchSize);
