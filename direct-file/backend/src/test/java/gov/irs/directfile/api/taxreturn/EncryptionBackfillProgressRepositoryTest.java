@@ -96,12 +96,38 @@ class EncryptionBackfillProgressRepositoryTest extends BaseRepositoryTest {
     }
 
     @Test
+    void allTablesCleanlyMigrated_isFalseWhenNoRowsExistAtAll() {
+        // The default state: the backfill ships disabled and has never run, so this table is
+        // empty on every deployment. "No bad row exists" would be vacuously true here -- the
+        // defect this test guards against.
+        assertThat(repository.allTablesCleanlyMigrated()).isFalse();
+    }
+
+    @Test
+    void allTablesCleanlyMigrated_isFalseWhenOnlyOneOfTwoTablesIsClean() {
+        EncryptionBackfillProgress onlyReturns = new EncryptionBackfillProgress();
+        onlyReturns.setTargetTable(EncryptionBackfillProgress.TAX_RETURNS);
+        onlyReturns.setCompleted(true);
+        onlyReturns.setFailed(0);
+        repository.save(onlyReturns);
+        // taxreturn_submissions is never saved -- untouched, not just incomplete.
+
+        assertThat(repository.allTablesCleanlyMigrated()).isFalse();
+    }
+
+    @Test
     void allTablesCleanlyMigrated_isTrueWhenEveryTableFinishedWithZeroFailures() {
-        EncryptionBackfillProgress clean = new EncryptionBackfillProgress();
-        clean.setTargetTable(EncryptionBackfillProgress.TAX_RETURNS);
-        clean.setCompleted(true);
-        clean.setFailed(0);
-        repository.save(clean);
+        EncryptionBackfillProgress returns = new EncryptionBackfillProgress();
+        returns.setTargetTable(EncryptionBackfillProgress.TAX_RETURNS);
+        returns.setCompleted(true);
+        returns.setFailed(0);
+
+        EncryptionBackfillProgress submissions = new EncryptionBackfillProgress();
+        submissions.setTargetTable(EncryptionBackfillProgress.TAX_RETURN_SUBMISSIONS);
+        submissions.setCompleted(true);
+        submissions.setFailed(0);
+
+        repository.saveAll(java.util.List.of(returns, submissions));
 
         assertThat(repository.allTablesCleanlyMigrated()).isTrue();
     }
