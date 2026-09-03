@@ -19,7 +19,13 @@ import gov.irs.directfile.models.autoconfigure.EncryptionContextProperties;
 @Slf4j
 @SuppressWarnings("PMD.UnusedPrivateMethod")
 public class DataEncryptDecrypt {
-    /** Stable log marker. The Phase C gate is a log query for this string returning zero. */
+    /**
+     * Stable log marker for ciphertext seen with no bound purpose. Useful for watching a
+     * sweep in progress, but the Phase C gate itself is
+     * {@code EncryptionBackfillProgressRepository.allTablesCleanlyMigrated()} — a query
+     * against the persisted counters, not a search over logs whose retention this class has
+     * no control over.
+     */
     private static final String LEGACY_MARKER = "ENCRYPTION_CONTEXT_LEGACY";
 
     private static final long LEGACY_LOG_EVERY = 1000L;

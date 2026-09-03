@@ -84,8 +84,12 @@ public class EncryptionBackfillService {
 
         // Advance past every id in the page, including any that failed. A row that cannot
         // be migrated is reported under FAILURE_MARKER and left behind rather than retried
-        // forever; leaving it would stall the sweep permanently.
+        // forever; leaving it would stall the sweep permanently. The counters commit in the
+        // same save as the cursor, so they can never drift out of sync with it.
         progress.setLastId(ids.get(ids.size() - 1));
+        progress.setAttempted(progress.getAttempted() + ids.size());
+        progress.setSucceeded(progress.getSucceeded() + succeeded);
+        progress.setFailed(progress.getFailed() + ids.size() - succeeded);
         progressRepository.save(progress);
 
         return new BatchResult(ids.size(), succeeded, false);

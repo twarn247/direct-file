@@ -1,0 +1,36 @@
+databaseChangeLog:
+  - changeSet:
+      id: encryption-backfill-progress-add-counters
+      author: directfile
+      changes:
+        - addColumn:
+            tableName: encryption_backfill_progress
+            columns:
+              - column:
+                  name: attempted
+                  type: int
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: succeeded
+                  type: int
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: failed
+                  type: int
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+      rollback:
+        - dropColumn:
+            tableName: encryption_backfill_progress
+            columns:
+              - column:
+                  name: attempted
+              - column:
+                  name: succeeded
+              - column:
+                  name: failed

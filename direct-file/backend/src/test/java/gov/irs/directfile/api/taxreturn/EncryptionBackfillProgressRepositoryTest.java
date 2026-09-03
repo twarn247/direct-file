@@ -73,4 +73,36 @@ class EncryptionBackfillProgressRepositoryTest extends BaseRepositoryTest {
                         .isCompleted())
                 .isTrue();
     }
+
+    @Test
+    void allTablesCleanlyMigrated_isFalseWhenAnyTableIsIncomplete() {
+        EncryptionBackfillProgress incomplete = new EncryptionBackfillProgress();
+        incomplete.setTargetTable(EncryptionBackfillProgress.TAX_RETURNS);
+        incomplete.setCompleted(false);
+        repository.save(incomplete);
+
+        assertThat(repository.allTablesCleanlyMigrated()).isFalse();
+    }
+
+    @Test
+    void allTablesCleanlyMigrated_isFalseWhenACompletedTableHasFailures() {
+        EncryptionBackfillProgress completedWithFailures = new EncryptionBackfillProgress();
+        completedWithFailures.setTargetTable(EncryptionBackfillProgress.TAX_RETURNS);
+        completedWithFailures.setCompleted(true);
+        completedWithFailures.setFailed(1);
+        repository.save(completedWithFailures);
+
+        assertThat(repository.allTablesCleanlyMigrated()).isFalse();
+    }
+
+    @Test
+    void allTablesCleanlyMigrated_isTrueWhenEveryTableFinishedWithZeroFailures() {
+        EncryptionBackfillProgress clean = new EncryptionBackfillProgress();
+        clean.setTargetTable(EncryptionBackfillProgress.TAX_RETURNS);
+        clean.setCompleted(true);
+        clean.setFailed(0);
+        repository.save(clean);
+
+        assertThat(repository.allTablesCleanlyMigrated()).isTrue();
+    }
 }

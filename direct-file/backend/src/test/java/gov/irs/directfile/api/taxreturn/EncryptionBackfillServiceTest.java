@@ -75,6 +75,30 @@ class EncryptionBackfillServiceTest {
     }
 
     @Test
+    void processNextBatch_accumulatesCountersAcrossBatchesRatherThanOverwriting() {
+        UUID a = new UUID(0L, 1L);
+        EncryptionBackfillProgress existing = new EncryptionBackfillProgress();
+        existing.setTargetTable(EncryptionBackfillProgress.TAX_RETURNS);
+        existing.setLastId(new UUID(0L, 5L));
+        existing.setAttempted(10);
+        existing.setSucceeded(9);
+        existing.setFailed(1);
+        when(progressRepository.findById(EncryptionBackfillProgress.TAX_RETURNS))
+                .thenReturn(Optional.of(existing));
+        when(taxReturnRepository.findIdsForBackfillAfter(eq(existing.getLastId()), any()))
+                .thenReturn(List.of(a));
+        when(rowService.reencryptTaxReturn(a)).thenReturn(false);
+
+        service.processNextBatch(EncryptionBackfillProgress.TAX_RETURNS, 10);
+
+        ArgumentCaptor<EncryptionBackfillProgress> saved = ArgumentCaptor.forClass(EncryptionBackfillProgress.class);
+        verify(progressRepository).save(saved.capture());
+        assertThat(saved.getValue().getAttempted()).isEqualTo(11);
+        assertThat(saved.getValue().getSucceeded()).isEqualTo(9);
+        assertThat(saved.getValue().getFailed()).isEqualTo(2);
+    }
+
+    @Test
     void processNextBatch_advancesPastRowsThatFail() {
         UUID a = new UUID(0L, 1L);
         when(progressRepository.findById(EncryptionBackfillProgress.TAX_RETURNS))
