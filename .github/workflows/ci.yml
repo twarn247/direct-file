@@ -207,6 +207,7 @@ jobs:
                   --format sarif \
                   --output "trivy-results/$name.sarif" \
                   --severity CRITICAL,HIGH \
+                  --ignorefile direct-file/.trivyignore \
                   --exit-code 0; then
               echo "::error::Trivy failed to scan $name (a real scan error, not a vulnerability finding)"
               status=1

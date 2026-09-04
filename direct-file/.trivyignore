@@ -1,0 +1,25 @@
+# Dependency-scan exceptions. Every entry needs three things: why it is not
+# exploitable here, what would change that, and an expiry date. On expiry the
+# entry stops suppressing and the build fails until someone re-justifies it --
+# that is the point, not an inconvenience.
+#
+# Adding an entry to get a build green is not triage. If you cannot write the
+# "why" line honestly, the finding is real.
+#
+# Review with:
+#   cd direct-file/<module> && ./mvnw cyclonedx:makeBom
+#   trivy sbom target/bom.json --severity CRITICAL,HIGH --ignorefile ../.trivyignore
+#
+# Required shape for a new entry:
+# CVE-XXXX-YYYYY exp:2027-03-03
+#   Package: com.example:example-lib (test scope only, never in a deployed artifact).
+#   No upstream fix as of 2026-09-03. Would become relevant if this moved to
+#   compile scope.
+#
+# As of 2026-09-03 this file has no entries. The Spring Boot 3.5.16 bump plus
+# direct dependencyManagement pins (netty, tomcat-embed-core, postgresql,
+# bcprov-jdk18on -- see boms/irs-spring-boot-starter-parent/pom.xml) cleared
+# every CRITICAL/HIGH finding across all six scanned modules. This file is
+# wired into CI now so the next finding that genuinely has no fix, or is
+# unreachable, has somewhere to go with a real justification and an expiry --
+# not so it starts with placeholder content.
