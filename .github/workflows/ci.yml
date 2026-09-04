@@ -104,8 +104,17 @@ jobs:
     timeout-minutes: 30
     # security-events: write is scoped to this job only. build-and-test runs mvn
     # verify, which executes plugin and test code drawn from the same dependency
-    # tree this job measures at 31 CRITICAL / 257 HIGH -- that step should not
-    # also hold write access to code scanning.
+    # tree this job scans -- that step should not also hold write access to code
+    # scanning.
+    #
+    # As of 2026-09-03 that tree measures 0 CRITICAL / 0 HIGH across all six
+    # scanned modules (raw per-module sum, not deduplicated -- a shared CVE across
+    # modules is counted once per module here, but once total on the GitHub Code
+    # Scanning dashboard). The pre-triage baseline was 49 CRITICAL / 257 HIGH raw;
+    # see docs/security/2026-09-03_spring-boot-bump-measurement.md for what closed
+    # it and direct-file/.trivyignore's header for how a future finding gets
+    # justified rather than silenced. This is a point-in-time count, not a current
+    # guarantee -- vulnerability databases change daily.
     permissions:
       contents: read
       security-events: write
@@ -186,16 +195,18 @@ jobs:
       # to `trivy sbom <path>`, confirmed by reading aquasecurity/trivy-action's own
       # entrypoint script), not a directory -- so this loops per module rather than
       # pointing scan-ref at the whole sboms/ directory, which the wrapper action does not
-      # document as supported for this scan type. Reporting-only for now: exit-code 0
-      # means findings never fail the job. See the handback: this becomes blocking once
-      # the existing backlog is known and triaged.
-      # No set -e: a genuine scan error on one module (a malformed SBOM, a
-      # vulnerability-DB fetch failure -- --exit-code 0 already means a *finding*
-      # never fails this) must not abort the loop before the remaining modules are
-      # scanned. Every module is attempted; the step fails at the end if any of
-      # them had a real error, so one bad module reads as one failure rather than
-      # cascading into five more when the later upload-sarif steps find missing
-      # files.
+      # document as supported for this scan type.
+      #
+      # Blocking as of 2026-09-03. --exit-code 1 means a CRITICAL or HIGH finding fails
+      # this job. Everything known at that date is either fixed, pinned, or carried in
+      # direct-file/.trivyignore with a written justification and an expiry, so a new
+      # failure here means a genuinely new finding -- or an expired exception, which is
+      # the same signal by design.
+      #
+      # The `status=1` handling below is unchanged and still distinguishes a scan ERROR
+      # (malformed SBOM, vuln-DB fetch failure) from a FINDING: an error on one module
+      # must not abort the loop before the rest are scanned. Both now fail the job, but
+      # the ::error:: annotation says which happened.
       - name: Scan SBOMs with Trivy
         run: |
           mkdir -p trivy-results
@@ -208,8 +219,8 @@ jobs:
                   --output "trivy-results/$name.sarif" \
                   --severity CRITICAL,HIGH \
                   --ignorefile direct-file/.trivyignore \
-                  --exit-code 0; then
-              echo "::error::Trivy failed to scan $name (a real scan error, not a vulnerability finding)"
+                  --exit-code 1; then
+              echo "::error::Trivy failed for $name (a finding, or a scan error -- see the group above)"
               status=1
             fi
             echo "::endgroup::"
