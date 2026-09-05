@@ -115,6 +115,14 @@ jobs:
     # it and direct-file/.trivyignore's header for how a future finding gets
     # justified rather than silenced. This is a point-in-time count, not a current
     # guarantee -- vulnerability databases change daily.
+    #
+    # Branch protection on main is not configured yet (a standing gap tracked
+    # separately, outside this workflow file). When it is: make build-and-test a
+    # required status check, but NOT this job. A newly published CVE against any
+    # transitive dependency turns this job red on every open PR with no repository
+    # change -- including the PR that would add the .trivyignore entry to fix it,
+    # if this job were required. Blocking-but-not-required keeps that recovery
+    # path open while still surfacing every finding.
     permissions:
       contents: read
       security-events: write
@@ -190,6 +198,15 @@ jobs:
 
       - name: Set up Trivy
         uses: aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567 # v0.3.1
+        with:
+          # Every other action in this workflow is SHA-pinned; the trivy binary itself
+          # was the one unpinned input to a now-blocking gate (defaults to `latest`).
+          # A trivy release that changes severity mapping, adds a detector, or alters
+          # .trivyignore parsing would otherwise turn CI red with no repository change.
+          # Update deliberately, alongside re-verifying the measurements this plan's
+          # decision record and CVE pins are based on -- see
+          # docs/security/2026-09-03_spring-boot-bump-measurement.md.
+          version: v0.74.0
 
       # trivy's `sbom` subcommand scans one artifact at a time (it is a direct passthrough
       # to `trivy sbom <path>`, confirmed by reading aquasecurity/trivy-action's own

@@ -39,7 +39,11 @@
         <pdfbox.version>3.0.3</pdfbox.version>
         <amazon-s3-encryption-client-java.version>3.1.3</amazon-s3-encryption-client-java.version>
         <aws.java.sdk.version>2.20.131</aws.java.sdk.version>
-        <bouncycastle.bcpkix.version>1.78.1</bouncycastle.bcpkix.version>
+        <!-- Kept in lockstep with bouncycastle.bcprov.version below, per BouncyCastle's
+             own guidance: bcprov-jdk18on was pinned to 1.84 to clear CVE-2025-14813,
+             leaving bcpkix-jdk18on mismatched at its earlier 1.78.1. Verified 1.84 is
+             published on Maven Central before pinning. -->
+        <bouncycastle.bcpkix.version>1.84</bouncycastle.bcpkix.version>
         <!-- CVE-2026-59901, CVE-2026-55831, CVE-2026-55833, CVE-2026-56745, CVE-2026-56819:
              Spring Boot 3.5.16's own BOM still pins netty-bom to 4.1.135.Final; this
              property override (Spring Boot's documented mechanism for bumping a
