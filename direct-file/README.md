@@ -223,8 +223,15 @@ scans each with Trivy. Results appear in the Security tab, one category per modu
 (`trivy-backend`, `trivy-state-api`, `trivy-status`, `trivy-submit`,
 `trivy-email-service`, `trivy-data-models`) — GitHub Code Scanning no longer combines
 multiple SARIF runs uploaded under a shared category, so each module gets its own
-upload step. **It is currently reporting-only and does not fail the build** — see the
-handback in `docs/superpowers/plans/2026-08-29-ci-pipeline-and-dependency-scanning.md`.
+upload step.
+
+**A CRITICAL or HIGH finding fails the build** as of 2026-09-03. Known exceptions live
+in `direct-file/.trivyignore`, one CVE per entry — every entry needs a written reason
+the finding does not apply here, what would change that, and an expiry date
+(`exp:YYYY-MM-DD`). An expired entry stops suppressing and the build fails until
+someone re-justifies it; that lapse is the mechanism, not a bug. See
+`docs/security/2026-09-03_spring-boot-bump-measurement.md` for how the pre-gate
+backlog was cleared.
 
 **`client`** runs `npm run lint` (ESLint and Stylelint, both at `--max-warnings=0`, with
 `tsc --build` via `prelint:ts`) and all three vitest suites for `df-client-app`. It does
