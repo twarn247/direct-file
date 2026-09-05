@@ -4,7 +4,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.3.10</version>
+        <version>3.5.16</version>
         <relativePath/>
         <!-- lookup parent from repository -->
     </parent>
@@ -39,12 +39,41 @@
         <pdfbox.version>3.0.3</pdfbox.version>
         <amazon-s3-encryption-client-java.version>3.1.3</amazon-s3-encryption-client-java.version>
         <aws.java.sdk.version>2.20.131</aws.java.sdk.version>
-        <bouncycastle.bcpkix.version>1.78.1</bouncycastle.bcpkix.version>
+        <!-- Kept in lockstep with bouncycastle.bcprov.version below, per BouncyCastle's
+             own guidance: bcprov-jdk18on was pinned to 1.84 to clear CVE-2025-14813,
+             leaving bcpkix-jdk18on mismatched at its earlier 1.78.1. Verified 1.84 is
+             published on Maven Central before pinning. -->
+        <bouncycastle.bcpkix.version>1.84</bouncycastle.bcpkix.version>
+        <!-- CVE-2026-59901, CVE-2026-55831, CVE-2026-55833, CVE-2026-56745, CVE-2026-56819:
+             Spring Boot 3.5.16's own BOM still pins netty-bom to 4.1.135.Final; this
+             property override (Spring Boot's documented mechanism for bumping a
+             BOM-managed version) moves every netty-bom artifact to the fixed release.
+             Remove when spring-boot-dependencies catches up. -->
+        <netty.version>4.1.136.Final</netty.version>
+        <!-- CVE-2026-65182, CVE-2026-65905, CVE-2026-68525: Spring Boot 3.5.16's own
+             BOM still pins tomcat-embed-core to 10.1.55. Trivy's advisory data names
+             10.1.58 as the fixed version, but that release was never published to
+             Maven Central (verified against the artifact's maven-metadata.xml);
+             10.1.59 is the actual latest 10.1.x release and carries the fix forward.
+             Stays on the 10.1.x line (11.0.x is a Jakarta EE 11 / Servlet 6.1 jump
+             Spring Boot 3.5.x does not target). Remove when spring-boot-dependencies
+             catches up. -->
+        <tomcat.version>10.1.59</tomcat.version>
+        <!-- CVE-2026-54291: Spring Boot 3.5.16's own BOM still pins postgresql to
+             42.7.11. Verified 42.7.12 is published on Maven Central before pinning.
+             Remove when spring-boot-dependencies catches up. -->
+        <postgresql.version>42.7.12</postgresql.version>
+        <!-- CVE-2025-14813: org.bouncycastle:bcprov-jdk18on is pulled in transitively
+             (not through any BOM Spring Boot or this pom otherwise imports) at
+             1.78.1. Verified 1.84 is published on Maven Central and is one of
+             trivy's confirmed fixed versions before pinning. -->
+        <bouncycastle.bcprov.version>1.84</bouncycastle.bcprov.version>
         <commons-compress.version>1.26.0</commons-compress.version>
         <commons-io.version>2.15.1</commons-io.version>
         <commons-text.version>1.12.0</commons-text.version>
         <guava-version>33.0.0-jre</guava-version>
         <wiremock.version>3.9.1</wiremock.version>
+        <okhttp.version>4.12.0</okhttp.version>
         <openfeature.version>1.14.1</openfeature.version>
 
         <!-- maven plugin versions-->
@@ -98,6 +127,17 @@
                 <groupId>software.amazon.awssdk</groupId>
                 <artifactId>bom</artifactId>
                 <version>${aws-sdk.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <!-- Spring Boot managed okhttp3 (used by backend/state-api test-scope
+                 deps) through 3.3.x and dropped it from spring-boot-dependencies in
+                 3.4.0. Importing it directly at the same version 3.3.x already
+                 pinned keeps the resolved okhttp/mockwebserver versions unchanged. -->
+            <dependency>
+                <groupId>com.squareup.okhttp3</groupId>
+                <artifactId>okhttp-bom</artifactId>
+                <version>${okhttp.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -174,6 +214,11 @@
                 <groupId>org.bouncycastle</groupId>
                 <artifactId>bcpkix-jdk18on</artifactId>
                 <version>${bouncycastle.bcpkix.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.bouncycastle</groupId>
+                <artifactId>bcprov-jdk18on</artifactId>
+                <version>${bouncycastle.bcprov.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.springdoc</groupId>

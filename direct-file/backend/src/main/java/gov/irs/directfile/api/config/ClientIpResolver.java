@@ -85,8 +85,11 @@ public class ClientIpResolver {
     /**
      * Literal-only. Deliberately not InetAddress.getByName, which resolves hostnames via DNS --
      * these values come from request headers, so that would let a crafted header trigger an
-     * attacker-chosen outbound DNS query. IpAddressMatcher.matches() calls getByName internally
-     * on Spring Security 6.3, so nothing may reach it without passing this check first.
+     * attacker-chosen outbound DNS query. As of Spring Security 6.5.11, IpAddressMatcher.matches()
+     * itself rejects non-IP-literal input via assertNotHostName() before it would ever resolve one,
+     * so this guard is now defence-in-depth rather than the sole protection -- kept so the
+     * resolver's behavior does not depend on that library internal. Removing it today would
+     * surface as an IllegalArgumentException from matches(), not a silent DNS lookup.
      */
     private static boolean isIpLiteral(String value) {
         return StringUtils.isNotBlank(value) && InetAddresses.isInetAddress(value.strip());
