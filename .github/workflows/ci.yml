@@ -244,6 +244,45 @@ jobs:
           done
           exit "$status"
 
+      # The npm tree is scanned straight from its lockfiles -- no SBOM step, because
+      # trivy fs reads package-lock.json natively. It honours the lockfile's "dev": true
+      # markers, so this covers the production tree only; devDependency findings do not
+      # gate. That is why dependency classification is load-bearing here (see the
+      # 2026-09-05 client dependency scanning plan).
+      #
+      # df-common has its own lockfile and is scanned separately. No `set -e`, matching
+      # the SBOM loop above: one bad lockfile must not stop the other being scanned.
+      #
+      # if: always() -- without it this step defaults to if: success(), so a failure in
+      # the Maven "Scan SBOMs with Trivy" step above (a different ecosystem entirely)
+      # skips this step outright, and the two npm upload steps below (which already
+      # have always()) then fail with "Path does not exist" since this step never ran
+      # to produce their input. Same principle as this step's own no-`set -e` comment,
+      # just one step up: one ecosystem's scan failing must not stop the other being
+      # scanned.
+      - name: Scan client lockfiles with Trivy
+        if: always()
+        run: |
+          mkdir -p trivy-results
+          status=0
+          for lock in direct-file/df-client/package-lock.json direct-file/df-client/df-common/package-lock.json; do
+            [ -f "$lock" ] || { echo "::warning::$lock not found, skipping"; continue; }
+            name=$(echo "$lock" | sed 's|direct-file/df-client/||; s|/package-lock.json||; s|package-lock.json|df-client|')
+            echo "::group::Scanning $name"
+            if ! trivy fs "$lock" \
+                  --scanners vuln \
+                  --format sarif \
+                  --output "trivy-results/npm-$name.sarif" \
+                  --severity CRITICAL,HIGH \
+                  --ignorefile direct-file/.trivyignore \
+                  --exit-code 1; then
+              echo "::error::Trivy failed for $name (a finding, or a scan error -- see the group above)"
+              status=1
+            fi
+            echo "::endgroup::"
+          done
+          exit "$status"
+
       # One step per module rather than a single directory upload: GitHub Code
       # Scanning stopped combining multiple SARIF runs uploaded under the same
       # category (confirmed by a failed run -- "The CodeQL Action does not support
@@ -297,13 +336,27 @@ jobs:
           sarif_file: trivy-results/libs-data-models.sarif
           category: trivy-data-models
 
+      - name: Upload SARIF (npm df-client)
+        if: always() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: github/codeql-action/upload-sarif@6f5948dfacef28e207b48d0905cf90c03365536d # v3.37.9
+        with:
+          sarif_file: trivy-results/npm-df-client.sarif
+          category: trivy-npm-df-client
+
+      - name: Upload SARIF (npm df-common)
+        if: always() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: github/codeql-action/upload-sarif@6f5948dfacef28e207b48d0905cf90c03365536d # v3.37.9
+        with:
+          sarif_file: trivy-results/npm-df-common.sarif
+          category: trivy-npm-df-common
+
       - name: Summarise findings
         if: always()
         run: |
           echo "### Dependency scan" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "Reporting-only. Findings are in the Security tab, one category per module:" >> "$GITHUB_STEP_SUMMARY"
-          echo "trivy-backend, trivy-state-api, trivy-status, trivy-submit, trivy-email-service, trivy-data-models." >> "$GITHUB_STEP_SUMMARY"
+          echo "Blocking as of 2026-09-03 (Maven) / 2026-09-05 (npm). Findings are in the Security tab, one category per module:" >> "$GITHUB_STEP_SUMMARY"
+          echo "trivy-backend, trivy-state-api, trivy-status, trivy-submit, trivy-email-service, trivy-data-models, trivy-npm-df-client, trivy-npm-df-common." >> "$GITHUB_STEP_SUMMARY"
 
   client:
     name: Lint and test the client

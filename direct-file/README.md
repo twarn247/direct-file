@@ -233,6 +233,17 @@ someone re-justifies it; that lapse is the mechanism, not a bug. See
 `docs/security/2026-09-03_spring-boot-bump-measurement.md` for how the pre-gate
 backlog was cleared.
 
+The client's npm tree is scanned too, straight from `df-client/package-lock.json` and
+`df-client/df-common/package-lock.json` with `trivy fs` — no SBOM step, since Trivy reads
+lockfiles natively. It is blocking, on the same CRITICAL/HIGH threshold and the same shared
+`direct-file/.trivyignore` as the Maven scan.
+
+**Trivy honours the lockfile's `"dev": true` markers, so only the production tree gates.**
+That makes dependency classification a security decision, not a style preference: a build tool
+declared under `dependencies` is scanned as though it ships. Before adding a package to
+`dependencies`, confirm it is actually reachable from bundled code — `npm run build:development`
+then grepping `dist/assets/` is the authority.
+
 **`client`** runs `npm run lint` (ESLint and Stylelint, both at `--max-warnings=0`, with
 `tsc --build` via `prelint:ts`) and all three vitest suites for `df-client-app`. It does
 not depend on the Java jobs — the client's `generate-fact-dictionary` step is plain
