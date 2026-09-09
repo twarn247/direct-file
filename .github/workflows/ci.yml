@@ -252,7 +252,16 @@ jobs:
       #
       # df-common has its own lockfile and is scanned separately. No `set -e`, matching
       # the SBOM loop above: one bad lockfile must not stop the other being scanned.
+      #
+      # if: always() -- without it this step defaults to if: success(), so a failure in
+      # the Maven "Scan SBOMs with Trivy" step above (a different ecosystem entirely)
+      # skips this step outright, and the two npm upload steps below (which already
+      # have always()) then fail with "Path does not exist" since this step never ran
+      # to produce their input. Same principle as this step's own no-`set -e` comment,
+      # just one step up: one ecosystem's scan failing must not stop the other being
+      # scanned.
       - name: Scan client lockfiles with Trivy
+        if: always()
         run: |
           mkdir -p trivy-results
           status=0
