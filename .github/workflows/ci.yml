@@ -413,3 +413,18 @@ jobs:
       - name: Test (all screens)
         if: always()
         run: npm run test:ci:3
+
+      # A test that writes into the repository is almost always a test rewriting its own
+      # expectation -- which is how flowSnapshots.test.ts silently blessed changes to the
+      # interview's screen ordering until 2026-09-09. `always()` so this reports even when
+      # an earlier test step failed, which is exactly when a self-rewriting test does its
+      # damage.
+      - name: No test may modify tracked files
+        if: always()
+        working-directory: .
+        run: |
+          if ! git diff --exit-code --stat; then
+            echo "::error::The test run modified tracked files (listed above). A test that"
+            echo "::error::rewrites its own expected output cannot fail twice -- fix the test."
+            exit 1
+          fi
