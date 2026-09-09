@@ -1,5 +1,6 @@
 import { describe, it, Mock } from 'vitest';
 import fs from 'fs';
+import path from 'path';
 import { createFlowConfig } from '../../flow/flowConfig.js';
 import flowNodes from '../../flow/flow.js';
 import { ConcretePath, FactGraph, scalaListToJsArray } from '@irs/js-factgraph-scala';
@@ -76,23 +77,32 @@ describe(`Flow snapshot tests`, () => {
   ];
   scenarioFolders.forEach((s) => {
     s.scenarioJsons.forEach((json) => {
-      it(`${json} produces the same snapshot`, () => {
+      it(`${json} produces the same snapshot`, async () => {
         const fileName = s.folder + `/` + json;
         // add a suffix to snapshot filename so we can differentiate the ero from non-ero files
         const prefix = s.folder === ERO_SCENARIO_FOLDER ? `ero-` : ``;
         const snapshotFileName = FLOW_SNAPSHOTS_FOLDER + `/${prefix}` + json.replace(`.json`, `.csv`);
         const jsonString = fs.readFileSync(fileName, `utf-8`);
-        const flowSnapshot = fs.existsSync(snapshotFileName) ? fs.readFileSync(snapshotFileName, `utf-8`) : undefined;
         const factJson = JSON.parse(jsonString);
         const { factGraph } = setupFactGraph(factJson.facts);
         const screens = getFlowScreenOrderingFromFlowConfig(factGraph);
-        const screensMatchSnapshot = screens.join(`\n`) === flowSnapshot;
-        if (!screensMatchSnapshot) {
-          // eslint-disable-next-line no-console
-          console.warn(`Snapshot did not match for ${json} -- writing snapshot`);
-          fs.writeFileSync(snapshotFileName, screens.join(`\n`));
-        }
-        expect(screensMatchSnapshot).toBe(true);
+
+        // toMatchFileSnapshot rather than a hand-rolled compare-and-write: the previous
+        // version wrote the new ordering over the expectation BEFORE asserting, so a
+        // failing run destroyed what it was checking against and the next run passed.
+        // These files are the only assertion that the interview presents screens in the
+        // order it should, so a silently blessed change here is a real one.
+        //
+        // path.resolve is required here: unlike fs.readFileSync/writeFileSync above (both
+        // cwd-relative), toMatchFileSnapshot resolves a relative path against the TEST
+        // FILE's own directory (src/test/scenarioTests/), not cwd -- passing the raw
+        // cwd-relative string silently wrote 161 new files to a nested
+        // src/test/scenarioTests/src/test/scenarioTests/flow-snapshots/ path instead of
+        // updating the real, tracked ones. Confirmed via `git status` after the first run:
+        // the tracked files showed zero changes and a stray directory appeared instead.
+        //
+        // Regenerate deliberately with `npm run test:update-flow-snapshots`.
+        await expect(screens.join(`\n`)).toMatchFileSnapshot(path.resolve(snapshotFileName));
       });
     });
   });
