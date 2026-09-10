@@ -419,12 +419,24 @@ jobs:
       # interview's screen ordering until 2026-09-09. `always()` so this reports even when
       # an earlier test step failed, which is exactly when a self-rewriting test does its
       # damage.
-      - name: No test may modify tracked files
+      #
+      # git status --porcelain, not git diff --exit-code: the second bug this PR found
+      # (toMatchFileSnapshot resolving a path against the test file's own directory, not
+      # cwd) wrote 161 NEW files into an untracked, unignored directory -- git diff only
+      # reports tracked-file modifications, so that variant would have passed this guard
+      # silently. git status --porcelain reports untracked files too. Confirmed
+      # src/fact-dictionary/generated/*.ts (rewritten by generate-fact-dictionary before
+      # every test step) is gitignored -- only .gitignore itself is tracked there -- so
+      # this does not false-positive on that routine regeneration.
+      - name: No test may write into the repository
         if: always()
         working-directory: .
         run: |
-          if ! git diff --exit-code --stat; then
-            echo "::error::The test run modified tracked files (listed above). A test that"
-            echo "::error::rewrites its own expected output cannot fail twice -- fix the test."
+          status="$(git status --porcelain)"
+          if [ -n "$status" ]; then
+            echo "$status"
+            echo "::error::The test run modified or added files (listed above, tracked or"
+            echo "::error::untracked). A test that rewrites its own expected output cannot"
+            echo "::error::fail twice -- fix the test."
             exit 1
           fi
