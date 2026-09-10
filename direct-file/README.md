@@ -265,6 +265,22 @@ stripped for the public release, and was deleted rather than reinstated. `flowSn
 aborted on a dangling `backend-scenarios-ero` symlink and now skips that folder when its target
 is absent, which recovered 161 scenarios that were not running at all.
 
+The client job ends with a check that the test run left the working tree clean — no
+modified tracked files and no new untracked ones. A test that writes into the repository is
+nearly always one rewriting its own expected output, which cannot then fail twice —
+`flowSnapshots.test.ts` did exactly this until 2026-09-09, silently blessing changes to the
+interview's screen ordering. The check uses `git status --porcelain`, not `git diff`, because
+a first version of this fix wrote its output to the wrong (untracked) path and `git diff`
+alone would have missed exactly that.
+
+Flow snapshots are regenerated deliberately, never automatically:
+
+```sh
+cd direct-file/df-client/df-client-app && npm run test:update-flow-snapshots
+```
+
+Review the resulting diff as a behavioural change, because that is what it is.
+
 ### Reproducing a CI failure locally
 
 ```sh
