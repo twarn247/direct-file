@@ -186,6 +186,19 @@ stay identical apart from `frame-ancestors`, which meta delivery cannot express 
 whole reason the header exists. `df-client-app/src/test/contentSecurityPolicy.test.ts` fails
 if they diverge, for both applications.
 
+Neither application's `script-src` permits `'unsafe-inline'`. Both carry the same inline
+Google Tag Manager bootstrap and both allow it by the same SHA-256 hash, so injected inline
+script is blocked. Editing that script changes its hash and
+`df-client-app/src/test/contentSecurityPolicy.test.ts` fails until every copy is updated —
+`df-client-app/index.html`, `df-static-site/index.html`, and both files under
+`df-client/nginx/`.
+
+Because the policy is header-delivered, a tightening can be staged as
+`Content-Security-Policy-Report-Only` alongside the enforcing header and exercised in a
+browser before it blocks anything. There is no report collector, so violations appear in the
+browser console — enough for a pre-merge pass, which is how the `'unsafe-inline'` removal was
+verified.
+
 **These are the `-local` Dockerfiles.** Production serving is not in this repository, so
 whether production sends these headers is unverified and cannot be verified from here. If the
 production edge or CDN sets its own CSP, it will intersect with the meta tag exactly as these
