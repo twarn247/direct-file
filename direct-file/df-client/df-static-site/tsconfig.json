@@ -7,5 +7,5 @@
       "eslint-plugin-df-rules": ["../eslint-plugin-df-rules/src"]
     }
   },
-  "include": ["src", "../node_modules/vitest/globals.d.ts"]
+  "include": ["src", "./node_modules/vitest/globals.d.ts"]
 }
