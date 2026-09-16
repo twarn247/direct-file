@@ -113,5 +113,20 @@ describe(`CSP header and meta stay in sync`, () => {
     it(`${name}: the nginx config sends X-Frame-Options with always`, () => {
       expect(readFileSync(conf, `utf8`)).toMatch(/add_header\s+X-Frame-Options\s+DENY\s+always;/);
     });
+
+    it(`${name}: script-src does not permit arbitrary inline script`, () => {
+      // 'unsafe-inline' in script-src defeats the main reason the policy exists. Both
+      // pages carry the same GTM bootstrap and allow it by the same hash instead.
+      const header = parsePolicy(headerPolicyFrom(readFileSync(conf, `utf8`)));
+      const scriptSrc = header.get(`script-src`);
+
+      // expect(actual, message) is a two-argument form this repo's vitest/TypeScript
+      // version rejects (TS2554); a plain guard reports the same thing instead.
+      if (scriptSrc === undefined) {
+        throw new Error(`${name} has no script-src directive`);
+      }
+      expect(scriptSrc).not.toContain(`'unsafe-inline'`);
+      expect(scriptSrc).toMatch(/'sha256-[A-Za-z0-9+/=]+'/);
+    });
   });
 });
